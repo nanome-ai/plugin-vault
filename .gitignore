@@ -1,0 +1,7 @@
+__pycache__
+/.vscode
+/build
+/dist
+nanome_vault.egg-info
+nanome
+node_modules
