@@ -95,6 +95,9 @@ class Vault(nanome.PluginInstance):
         self.request_presenter_info(self.update_account)
 
     def update_account(self, info):
+        if not info.account_id:
+            return
+
         self.account = info.account_id
         account_dir = os.path.join(FILES_DIR, self.account)
         if not os.path.exists(account_dir):
