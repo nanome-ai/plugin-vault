@@ -139,12 +139,13 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         response['folders'] = []
         response['files'] = []
 
-        items = [item for item in os.listdir(path) if not item.startswith('.')]
-        for item in items:
-            is_dir = os.path.isdir(os.path.join(path, item))
-            response['folders' if is_dir else 'files'].append(item)
-        response['folders'].sort()
-        response['files'].sort()
+        if folder is None:
+            response['folders'].append('shared')
+        else:
+            items = sorted([item for item in os.listdir(path) if not item.startswith('.')])
+            for item in items:
+                is_dir = os.path.isdir(os.path.join(path, item))
+                response['folders' if is_dir else 'files'].append(item)
         self._write(json.dumps(response).encode("utf-8"))
 
     # Standard GET case: get a file

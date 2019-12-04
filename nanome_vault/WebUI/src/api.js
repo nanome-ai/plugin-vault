@@ -39,14 +39,6 @@ const API = {
   },
 
   list(path) {
-    if (path === '/') {
-      return {
-        success: true,
-        files: [],
-        folders: ['shared']
-      }
-    }
-
     path = replaceAccount(path)
     return request('/files' + path)
   },
