@@ -25,17 +25,19 @@ Vue.component('fa-text', FontAwesomeLayersText)
 
 Vue.directive('click-out', {
   bind(el, binding, vnode) {
-    binding.stop = e => e.stopPropagation()
-    binding.event = () => vnode.context[binding.expression]()
+    el.data = {
+      stop: e => e.stopPropagation(),
+      event: () => vnode.context[binding.expression]()
+    }
 
     setTimeout(() => {
-      document.body.addEventListener('click', binding.event)
-      el.addEventListener('click', binding.stop)
+      document.body.addEventListener('click', el.data.event)
+      el.addEventListener('click', el.data.stop)
     }, 0)
   },
-  unbind(el, binding) {
-    document.body.removeEventListener('click', binding.event)
-    el.removeEventListener('click', binding.stop)
+  unbind(el) {
+    document.body.removeEventListener('click', el.data.event)
+    el.removeEventListener('click', el.data.stop)
   }
 })
 
