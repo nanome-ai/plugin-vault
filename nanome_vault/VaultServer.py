@@ -177,7 +177,11 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     return
 
             elif command == 'upload':
-                for file in form['file']:
+                files = form['file']
+                if not isinstance(files, list):
+                    files = [files]
+
+                for file in files:
                     filename = file.filename
 
                     if not VaultServer.file_filter(filename):

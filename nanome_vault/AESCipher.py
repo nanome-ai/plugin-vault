@@ -14,7 +14,7 @@ def encrypt(data, key):
     key = get_key(key)
     iv = get_random_bytes(AES.block_size)
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    if type(data) == str:
+    if isinstance(data, str):
         data = data.encode('utf-8')
     data = pad(data, AES.block_size)
     return iv + cipher.encrypt(data)
