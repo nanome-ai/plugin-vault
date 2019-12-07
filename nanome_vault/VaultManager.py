@@ -1,4 +1,6 @@
 import os
+import re
+import shutil
 from . import AESCipher
 
 LOCK_TEXT = 'nanome-vault-lock'
@@ -7,18 +9,23 @@ FILES_DIR = os.path.expanduser('~/Documents/nanome-vault')
 if not os.path.exists(os.path.join(FILES_DIR, 'shared')):
     os.makedirs(os.path.join(FILES_DIR, 'shared'))
 
+class InvalidPathError(Exception):
+    pass
+
 # return true if path in vault and exists
-def is_safe_path(sub_path, base_path=FILES_DIR):
+def is_safe_path(sub_path, base_path=FILES_DIR, enforce_exists=True):
     safe = os.path.realpath(base_path)
     path = os.path.realpath(os.path.join(base_path, sub_path))
     common = os.path.commonprefix((safe, path))
-    return os.path.exists(path) and common == safe
+    is_safe = common == safe
+    exists = os.path.exists(path)
+    return is_safe and (not enforce_exists or exists)
 
 # return full path of item in vault
 def get_vault_path(path):
     path = FILES_DIR if path is None else os.path.join(FILES_DIR, path)
     if not is_safe_path(path):
-        return None
+        raise InvalidPathError
     return os.path.normpath(path)
 
 # return encryption root of path, or none if not encrypted
@@ -77,6 +84,52 @@ def list_path(path=None):
 
     return result
 
+# creates a path and returns True. returns False if path exists
+def create_path(path):
+    path = get_vault_path(path, enforce_exists=False)
+    if os.path.exists(path):
+        return False
+    os.makedirs(path)
+    return True
+
+# TODO: add key to delete locked path
+# deletes a path and returns True on success, False on error
+def delete_path(path):
+    path = get_vault_path(path)
+
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+        else:
+            shutil.rmtree(path)
+        return True
+    except:
+        return False
+
+# TODO: add key to add to locked path
+# add data to vault at path/filename, where filename can contain a path
+def add_file(path, filename, data):
+    path = get_vault_path(path)
+
+    # create folder paths
+    subfolder = os.path.join(path, os.path.dirname(filename))
+    if not os.path.exists(subfolder):
+        os.makedirs(subfolder)
+
+    filepath = os.path.join(path, filename)
+
+    # rename on duplicates: file.txt -> file (n).txt
+    reg = r'(.+/)([^/]+?)(?: \((\d+)\))?(\.\w+)'
+    (path, name, copy, ext) = re.search(reg, filepath).groups()
+    copy = 1 if copy is None else int(copy)
+
+    while os.path.isfile(filepath):
+        copy += 1
+        filepath = '%s%s (%d)%s' % (path, name, copy, ext)
+
+    with open(filepath, "wb") as f:
+        f.write(data)
+
 # encrypts full contents of path, return False if encrypted subfolder exists
 def encrypt_folder(path, key):
     path = get_vault_path(path)
@@ -104,7 +157,7 @@ def encrypt_folder(path, key):
 def decrypt_folder(path, key):
     path = get_vault_path(path)
 
-    if not is_key_valid(path, key):
+    if not is_path_locked(path) or not is_key_valid(path, key):
         return False
 
     # decrypt all files not starting with '.'

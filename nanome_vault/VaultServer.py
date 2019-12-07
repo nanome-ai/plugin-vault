@@ -15,10 +15,10 @@ from nanome.util import Logs
 
 from . import VaultManager
 
-enable_logs = False
+ENABLE_LOGS = False
 
 # Format, MIME type, Binary
-Types = {
+TYPES = {
     "ico" : ("image/x-icon", True),
     "html" : ("text/html; charset=utf-8", False),
     "css" : ("text/css", False),
@@ -30,10 +30,13 @@ Types = {
 
 # Utility to get type specs tuple
 def get_type(format):
-    try:
-        return Types[format]
-    except:
-        return Types[""]
+    return TYPES.get(format, TYPES[''])
+
+POST_REQS = {
+    'upload': ['file'],
+    'encrypt': ['key'],
+    'decrypt': ['key']
+}
 
 SERVER_DIR = os.path.join(os.path.dirname(__file__), 'WebUI/dist')
 
@@ -72,40 +75,34 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self._write(json.dumps(response).encode("utf-8"))
 
     # Special GET case: get file list
-    def _send_list(self, folder=None):
+    def _send_list(self, path=None):
         if VaultServer.instance.keep_files_days > 0:
             self.file_cleanup()
 
-        path = VaultManager.get_vault_path(folder)
-        if path is None:
-            return self._send_json_error(404, 'File not found')
-
-        response = VaultManager.list_path(path)
-        response['success'] = True
-
-        self._set_headers(200, 'application/json')
-        self._write(json.dumps(response).encode("utf-8"))
+        try:
+            response = VaultManager.list_path(path)
+            response['success'] = True
+            self._set_headers(200, 'application/json')
+            self._write(json.dumps(response).encode("utf-8"))
+        except VaultManager.InvalidPathError:
+            self._send_json_error(404, 'Not found')
 
     # Standard GET case: get a file
     def _try_get_resource(self, base_dir, path):
         path = os.path.join(base_dir, path)
         if not VaultManager.is_safe_path(path, base_dir):
-            return self._send_json_error(404, 'File not found')
+            self._set_headers(404)
+            return
 
         try:
             ext = path.split(".")[-1]
             (mime, is_binary) = get_type(ext)
-            f = open(path, 'rb' if is_binary else 'r')
+            with open(path, 'rb' if is_binary else 'r') as f:
+                data = f.read()
+            self._set_headers(200, mime)
+            self._write(data if is_binary else data.encode("utf-8"))
         except:
             self._set_headers(404)
-            return
-
-        file = f.read()
-        data = file if is_binary else file.encode("utf-8")
-
-        self._set_headers(200, mime)
-        self._write(data)
-        f.close()
 
     # Called on GET request
     def do_GET(self):
@@ -116,6 +113,11 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         # path in vault
         if path.startswith('/files'):
             path = path[7:]
+
+            key = self.headers.get('vault-key')
+            if not VaultManager.is_key_valid(path, key):
+                self._send_json_error(403, 'Forbidden')
+                return
 
             if not is_file:
                 self._send_list(path or None)
@@ -137,76 +139,81 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         if not path.startswith('/files'):
             self._send_json_error(403, "Forbidden")
             return
-
-        content_len = int(self.headers.get('Content-Length'))
-        folder = os.path.join(VaultManager.FILES_DIR, path[7:])
-
-        # no files provided, create folders
-        if not content_len:
-            if os.path.exists(folder):
-                self._send_json_error(400, "Name already exists")
-            else:
-                os.makedirs(folder)
-                self._send_json_success()
-            return
+        path = path[7:]
 
         form = cgi.FieldStorage(
             fp=self.rfile,
             headers=self.headers,
-            environ={'REQUEST_METHOD':'POST'})
+            environ={'REQUEST_METHOD': 'POST'})
 
-        for file in form['file']:
-            file_name = file.filename
-
-            if not VaultServer.file_filter(file_name):
-                self._send_json_error(400, file_name + " format not supported")
-                return
-
-            # create folder paths
-            subfolder = os.path.join(folder, os.path.dirname(file_name))
-            if not os.path.exists(subfolder):
-                os.makedirs(subfolder)
-
-            file_path = os.path.join(folder, file_name)
-
-            # rename on duplicates: file.txt -> file (n).txt
-            reg = r'(.+/)([^/]+?)(?: \((\d+)\))?(\.\w+)'
-            (path, name, copy, ext) = re.search(reg, file_path).groups()
-            copy = 1 if copy is None else int(copy)
-
-            while os.path.isfile(file_path):
-                copy += 1
-                file_path = '%s%s (%d)%s' % (path, name, copy, ext)
-
-            # Create file
-            with open(file_path, "wb") as f:
-                f.write(file.file.read())
-
-        self._send_json_success()
-
-    # Called on DELETE request
-    def do_DELETE(self):
-        path = self._parse_path()
-        if not path.startswith('/files') or not path[7:]:
-            self._send_json_error(403, "Forbidden")
+        if 'command' not in form:
+            self._send_json_error(400, "Invalid command")
             return
 
-        path = os.path.join(VaultManager.FILES_DIR, path[7:])
+        # commands: create, delete, upload, encrypt, decrypt
+        command = form['command'].value
+
+        # check if missing any required form data
+        missing = [req for req in POST_REQS.get(command, []) if req not in form]
+        if missing:
+            self._send_json_error(400, "Missing required values: %s" % ', '.join(missing))
+            return
 
         try:
-            if os.path.isfile(path):
-                os.remove(path)
+            if command == 'create':
+                success = VaultManager.create_path(path)
+                if not success:
+                    self._send_json_error(400, "Path already exists")
+                    return
+
+            elif command == 'delete':
+                if not path or path == 'shared':
+                    self._send_json_error(403, "Forbidden")
+                    return
+
+                success = VaultManager.delete_path(path)
+                if not success:
+                    self._send_json_error(500, "Error deleting " + path)
+                    return
+
+            elif command == 'upload':
+                for file in form['file']:
+                    filename = file.filename
+
+                    if not VaultServer.file_filter(filename):
+                        self._send_json_error(400, filename + " format not supported")
+                        return
+
+                    VaultManager.add_file(path, filename, file.file.read())
+
+            elif command == 'encrypt':
+                success = VaultManager.encrypt_folder(path, form['key'].value)
+                if not success:
+                    self._send_json_error(400, "Path contains an encrypted folder")
+                    return
+
+            elif command == 'decrypt':
+                success = VaultManager.decrypt_folder(path, form['key'].value)
+                if not success:
+                    self._send_json_error(403, "Forbidden")
+                    return
+
             else:
-                shutil.rmtree(path)
+                self._send_json_error(400, "Invalid command")
+                return
+
+            self._send_json_success()
+
+        except VaultManager.InvalidPathError:
+            self._send_json_error(404, "Not found")
+
         except:
-            self._send_json_error(500, "Error deleting " + path)
-            return
+            Logs.warning("Server error:\n", traceback.format_exc())
+            self._send_json_error(500, "Server error")
 
-        self._send_json_success()
-
-    # Override to prevent HTTP server from logging every request if enable_logs is False
+    # Override to prevent HTTP server from logging every request if ENABLE_LOGS is False
     def log_message(self, format, *args):
-        if enable_logs:
+        if ENABLE_LOGS:
             http.server.BaseHTTPRequestHandler.log_message(self, format, *args)
 
     # Check file last accessed time and remove those older than 28 days
