@@ -33,7 +33,7 @@ def get_type(format):
     return TYPES.get(format, TYPES[''])
 
 POST_REQS = {
-    'upload': ['file'],
+    'upload': ['files'],
     'encrypt': ['key'],
     'decrypt': ['key']
 }
@@ -177,7 +177,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     return
 
             elif command == 'upload':
-                files = form['file']
+                files = form['files']
                 if not isinstance(files, list):
                     files = [files]
 

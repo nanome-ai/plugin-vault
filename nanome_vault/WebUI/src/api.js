@@ -9,6 +9,29 @@ function request(url, options) {
   return fetch(url, options).then(res => res.json())
 }
 
+function sendCommand(path, command, params) {
+  path = replaceAccount(path)
+
+  const data = new FormData()
+  data.append('command', command)
+
+  for (const key in params) {
+    const value = params[key]
+    if (value instanceof Array) {
+      for (const item of value) {
+        data.append(key, item)
+      }
+    } else {
+      data.append(key, params[key])
+    }
+  }
+
+  return request('/files' + path, {
+    method: 'POST',
+    body: data
+  })
+}
+
 const API = {
   login({ username, password }) {
     const body = {
@@ -75,31 +98,23 @@ const API = {
 
   upload(path, files) {
     if (!files || !files.length) return
-
-    const data = new FormData()
-    for (const file of files) {
-      data.append('file', file)
-    }
-
-    path = replaceAccount(path)
-    return request('/files' + path, {
-      method: 'POST',
-      body: data
-    })
+    return sendCommand(path, 'upload', { files })
   },
 
   delete(path) {
-    path = replaceAccount(path)
-    return request('/files' + path, {
-      method: 'DELETE'
-    })
+    return sendCommand(path, 'delete')
   },
 
   create(path) {
-    path = replaceAccount(path)
-    return request('/files' + path, {
-      method: 'POST'
-    })
+    return sendCommand(path, 'create')
+  },
+
+  encrypt(path, key) {
+    return sendCommand(path, 'encrypt', { key })
+  },
+
+  decrypt(path, key) {
+    return sendCommand(path, 'decrypt', { key })
   }
 }
 
