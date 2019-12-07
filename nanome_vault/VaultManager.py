@@ -22,9 +22,9 @@ def is_safe_path(sub_path, base_path=FILES_DIR, enforce_exists=True):
     return is_safe and (not enforce_exists or exists)
 
 # return full path of item in vault
-def get_vault_path(path):
+def get_vault_path(path, **kwargs):
     path = FILES_DIR if path is None else os.path.join(FILES_DIR, path)
-    if not is_safe_path(path):
+    if not is_safe_path(path, **kwargs):
         raise InvalidPathError
     return os.path.normpath(path)
 
