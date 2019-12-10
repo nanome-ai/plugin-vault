@@ -7,20 +7,35 @@
             icon="angle-right"
             class="text-2xl w-8 cursor-pointer text-gray-500 hover:text-black"
             fixed-width
-            @click="toggleFolder(folder)"
+            @click="toggleFolder(folder, isLocked(folder))"
             :class="{ expanded: expanded[folder] }"
           />
+          <a
+            v-if="locked.includes(folder)"
+            :title="folder"
+            class="file cursor-default"
+            @dblclick="openLocked(folder)"
+            @contextmenu.prevent="contextmenu($event, folder + '/', true)"
+          >
+            <fa-layers class="icon mr-2">
+              <fa-icon icon="folder" />
+              <fa-icon
+                :icon="isLocked(folder) ? 'lock' : 'lock-open'"
+                class="text-white"
+                transform="down-1 shrink-11"
+              />
+            </fa-layers>
+            <div class="truncate">{{ folder }}</div>
+          </a>
           <router-link
+            v-else
             :title="folder"
             :to="`${path}${folder}/`"
             class="file cursor-default"
             event="dblclick"
             @contextmenu.native.prevent="contextmenu($event, folder + '/')"
           >
-            <fa-icon
-              :icon="expanded[folder] ? 'folder-open' : 'folder'"
-              class="icon mr-2"
-            />
+            <fa-icon icon="folder" class="icon mr-2" />
             <div class="truncate">{{ folder }}</div>
           </router-link>
         </li>
@@ -82,6 +97,7 @@
         :title="file.full"
         class="p-2 file"
         @contextmenu.prevent="contextmenu($event, file.full)"
+        @dblclick="$root.$emit('download', path + file.full)"
       >
         <div class="w-8"></div>
         <fa-layers class="icon mr-2">
@@ -143,7 +159,19 @@ export default {
       this.expanded = {}
     },
 
-    async toggleFolder(folder) {
+    async expandLocked(folder) {
+      const unlocked = await this.unlockFolder(folder)
+      if (unlocked) {
+        this.toggleFolder(folder)
+      }
+    },
+
+    async toggleFolder(folder, locked) {
+      if (locked) {
+        const unlocked = await this.unlockFolder(folder)
+        if (!unlocked) return
+      }
+
       if (this.expanded[folder] === undefined) {
         this.$set(this.expanded, folder, false)
       }

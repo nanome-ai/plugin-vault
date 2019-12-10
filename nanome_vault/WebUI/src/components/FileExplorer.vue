@@ -20,11 +20,12 @@
     <div
       v-show="contextmenu.show"
       v-click-out="hideContextMenu"
+      @click="hideContextMenu"
       class="contextmenu"
       :style="{ top: contextmenu.top, left: contextmenu.left }"
     >
       <ul>
-        <li v-if="contextmenu.isFolder">
+        <li v-if="menuOptions.isFolder">
           <button class="text-gray-800" @click="newFolder(contextmenu.path)">
             <fa-icon icon="folder-plus" />
             new folder
@@ -36,7 +37,19 @@
             download
           </button>
         </li>
-        <li v-if="contextmenu.deletable">
+        <li v-if="menuOptions.encryptable">
+          <button class="text-gray-800" @click="encrypt(contextmenu.path)">
+            <fa-icon icon="lock" />
+            encrypt
+          </button>
+        </li>
+        <li v-else-if="contextmenu.locked">
+          <button class="text-gray-800" @click="decrypt(contextmenu.path)">
+            <fa-icon icon="lock-open" />
+            decrypt
+          </button>
+        </li>
+        <li v-if="menuOptions.deletable">
           <button class="text-red-500" @click="deleteItem">
             <fa-icon icon="trash" />
             delete
@@ -78,20 +91,41 @@ export default {
   computed: {
     path() {
       return this.$route.path
+    },
+
+    menuOptions() {
+      const { component, path, locked } = this.contextmenu
+
+      const isFolder = path.slice(-1) === '/'
+      const deletable = component && !['/shared/', '/account/'].includes(path)
+      const encryptable =
+        !locked && isFolder && !['/', '/shared/'].includes(path)
+
+      return {
+        isFolder,
+        deletable,
+        encryptable
+      }
     }
   },
 
   mounted() {
     this.$root.$on('contextmenu', this.showContextMenu)
+    this.$root.$on('download', this.download)
   },
 
   destroyed() {
     this.$root.$off('contextmenu', this.showContextMenu)
+    this.$root.$off('download', this.download)
   },
 
   methods: {
     refresh() {
-      this.$root.$emit('refresh')
+      if (this.contextmenu.component) {
+        this.contextmenu.component.refresh()
+      } else {
+        this.$root.$emit('refresh')
+      }
     },
 
     showDropzone() {
@@ -99,8 +133,6 @@ export default {
     },
 
     async newFolder(path) {
-      this.hideContextMenu()
-
       path = path || this.path
       if (path === '/') {
         path = '/shared/'
@@ -111,29 +143,27 @@ export default {
         body: `Creating folder in ${path}<br>Please provide a name:`,
         default: 'new folder'
       })
+      if (!folder) return
 
-      if (folder) {
-        const { success } = await API.create(path + folder)
-        if (!success) {
-          this.$modal.alert({
-            title: 'Name Already Exists',
-            body: 'Please select a different name'
-          })
-          return
-        }
+      const { success } = await API.create(path + folder)
+      if (!success) {
+        this.$modal.alert({
+          title: 'Name Already Exists',
+          body: 'Please select a different name'
+        })
+        return
+      }
 
-        if (path !== this.path) {
-          this.$router.push(path)
-        } else {
-          this.refresh()
-        }
+      if (path !== this.path) {
+        this.$router.push(path)
+      } else {
+        this.refresh()
       }
     },
 
     async deleteItem() {
-      this.hideContextMenu()
+      const { path, locked } = this.contextmenu
 
-      const path = this.contextmenu.path
       const confirm = await this.$modal.confirm({
         title: 'Delete Item',
         body: `Are you sure you want to delete ${path}?`,
@@ -141,38 +171,104 @@ export default {
         okTitle: 'delete',
         cancelClass: ''
       })
+      if (!confirm) return
 
-      if (confirm) {
-        await API.delete(path)
-        if (this.contextmenu.component) {
-          this.contextmenu.component.refresh()
-        } else {
-          this.refresh()
+      let key
+      if (locked) {
+        key = await this.$modal.prompt({
+          title: 'Delete Folder',
+          body: 'Please provide the key for this folder:',
+          okTitle: 'delete',
+          okTitle: 'delete',
+          cancelClass: '',
+          password: true
+        })
+        if (!key) return
+
+        const { success } = await API.verifyKey(path, key)
+        if (!success) {
+          this.$modal.alert({
+            title: 'Delete Cancelled',
+            body: 'The provided key was incorrect'
+          })
+          return
         }
       }
+
+      await API.delete(path, key)
+      this.refresh()
     },
 
-    async download(path) {
-      const a = document.createElement('a')
-      a.href = '/files' + path
-      a.download = path.substring(path.lastIndexOf('/') + 1)
-      a.click()
+    download(path) {
+      API.download(path)
     },
 
-    showContextMenu({ event, path, component }) {
+    async encrypt(path) {
+      const key = await this.$modal.prompt({
+        title: 'Lock Folder',
+        body: `Encrypting ${path}<br>Please provide a key:`,
+        okTitle: 'continue',
+        password: true
+      })
+      if (!key) return
+
+      const verifyKey = await this.$modal.prompt({
+        title: 'Lock Folder',
+        body: `Encrypting ${path}<br>Please verify your key:`,
+        okTitle: 'continue',
+        password: true
+      })
+      if (!verifyKey) return
+
+      if (key !== verifyKey) {
+        this.$modal.alert({
+          title: 'Encryption Cancelled',
+          body: 'The keys you provided did not match'
+        })
+        return
+      }
+
+      const yes = await this.$modal.confirm({
+        title: 'Confirm Encryption',
+        body:
+          'Are you sure you want to continue?<br><br><b>NOTE:</b> ' +
+          'If you lose your key, you will be unable to recover the files in this folder.',
+        okTitle: 'yes'
+      })
+      if (!yes) return
+
+      await API.encrypt(path, key)
+      API.keys.add(path, key)
+      this.refresh()
+    },
+
+    async decrypt(path) {
+      const key = await this.$modal.prompt({
+        title: 'Decrypt Folder',
+        body: `Decrypting ${path}<br>Please enter the key:`,
+        password: true
+      })
+      if (!key) return
+
+      await API.decrypt(path, key)
+      API.keys.remove(path)
+      this.refresh()
+    },
+
+    showContextMenu({ event, path, locked, component }) {
       this.contextmenu.show = true
       this.contextmenu.path = path
+      this.contextmenu.locked = locked
       this.contextmenu.component = component
       this.contextmenu.top = event.pageY + 1 + 'px'
       this.contextmenu.left = event.pageX + 1 + 'px'
-
-      const deletable = component && !['/shared/', '/account/'].includes(path)
-      this.contextmenu.deletable = deletable
-      this.contextmenu.isFolder = this.contextmenu.path.slice(-1) === '/'
     },
 
     hideContextMenu() {
       this.contextmenu.show = false
+      this.contextmenu.path = ''
+      this.contextmenu.locked = false
+      this.contextmenu.component = null
     }
   }
 }
