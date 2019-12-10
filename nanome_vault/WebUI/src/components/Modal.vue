@@ -7,7 +7,11 @@
 
         <div class="mt-2">
           <template v-if="options.type === 'prompt'">
-            <input ref="prompt" v-model="input1" type="text" />
+            <input
+              ref="prompt"
+              v-model="input1"
+              :type="options.password ? 'password' : 'text'"
+            />
           </template>
 
           <template v-else-if="options.type === 'login'">
@@ -73,7 +77,8 @@ const defaults = {
   okTitle: 'ok',
   okClass: '',
   cancelTitle: 'cancel',
-  cancelClass: 'danger'
+  cancelClass: 'danger',
+  password: false
 }
 
 const deferred = () => {
@@ -103,7 +108,8 @@ export default {
       okTitle: 'ok',
       okClass: '',
       cancelTitle: 'cancel',
-      cancelClass: 'danger'
+      cancelClass: 'danger',
+      password: false
     },
     input1: '',
     input2: '',
