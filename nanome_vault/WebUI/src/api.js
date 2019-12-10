@@ -6,7 +6,11 @@ function replaceAccount(path) {
 }
 
 function request(url, options) {
-  return fetch(url, options).then(res => res.json())
+  return fetch(url, options).then(async res => {
+    const json = await res.json()
+    json.code = res.status
+    return json
+  })
 }
 
 function sendCommand(path, command, params) {
@@ -32,7 +36,24 @@ function sendCommand(path, command, params) {
   })
 }
 
+const keys = {}
+
 const API = {
+  keys: {
+    add(path, key) {
+      path = path.replace(/\/$/, '')
+      keys[path] = key
+    },
+    get(path) {
+      const paths = Object.keys(keys)
+      const locked = paths.find(p => path.indexOf(p) == 0)
+      return keys[locked]
+    },
+    remove(path) {
+      delete keys[path]
+    }
+  },
+
   login({ username, password }) {
     const body = {
       login: username,
@@ -41,9 +62,7 @@ const API = {
     }
 
     return request(`${LOGIN_API}/login`, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       method: 'POST',
       body: JSON.stringify(body)
     })
@@ -54,24 +73,47 @@ const API = {
     if (!token) return {}
 
     return request(`${LOGIN_API}/session`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      method: 'GET'
+      headers: { Authorization: `Bearer ${token}` }
     })
   },
 
+  async download(path) {
+    const options = { headers: {} }
+    const key = API.keys.get(path)
+    if (key) {
+      options.headers['Vault-Key'] = key
+    }
+
+    const blob = await fetch('/files' + path, options).then(res => res.blob())
+
+    const a = document.createElement('a')
+    const url = window.URL.createObjectURL(blob)
+    a.href = url
+    a.download = path.substring(path.lastIndexOf('/') + 1)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
   list(path) {
+    const options = { headers: {} }
+    const key = API.keys.get(path)
+    if (key) {
+      options.headers['Vault-Key'] = key
+    }
+
     path = replaceAccount(path)
-    return request('/files' + path)
+    return request('/files' + path, options)
   },
 
   async getFolder(path) {
     const folder = {
       path: '',
       parent: '',
-      files: [],
-      folders: []
+      folders: [],
+      locked: [],
+      files: []
     }
 
     if (path.slice(-1) !== '/') {
@@ -84,9 +126,14 @@ const API = {
     }
 
     const data = await API.list(path)
-    if (!data.success) throw new Error(data.error)
-    folder.path = path
+    if (!data.success) {
+      const err = new Error(data.error)
+      err.code = data.code
+      throw err
+    }
 
+    folder.path = path
+    folder.locked = data.locked
     folder.folders = data.folders
     folder.files = data.files.map(f => {
       const [full, name, ext] = /^(.+?)(?:\.(\w+))?$/.exec(f)
@@ -98,11 +145,12 @@ const API = {
 
   upload(path, files) {
     if (!files || !files.length) return
-    return sendCommand(path, 'upload', { files })
+    return sendCommand(path, 'upload', { files, key: API.keys.get(path) })
   },
 
-  delete(path) {
-    return sendCommand(path, 'delete')
+  delete(path, key) {
+    key = key || API.keys.get(path)
+    return sendCommand(path, 'delete', { key })
   },
 
   create(path) {
@@ -115,6 +163,10 @@ const API = {
 
   decrypt(path, key) {
     return sendCommand(path, 'decrypt', { key })
+  },
+
+  verifyKey(path, key) {
+    return sendCommand(path, 'verify', { key })
   }
 }
 
