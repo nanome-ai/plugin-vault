@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import nanome
 from nanome.util import Logs
 
-from . import VaultManager
+from . import AESCipher, VaultManager
 
 ENABLE_LOGS = False
 
@@ -35,6 +35,7 @@ def get_type(format):
 POST_REQS = {
     'upload': ['files'],
     'encrypt': ['key'],
+    'verify': ['key'],
     'decrypt': ['key']
 }
 
@@ -88,7 +89,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_json_error(404, 'Not found')
 
     # Standard GET case: get a file
-    def _try_get_resource(self, base_dir, path):
+    def _try_get_resource(self, base_dir, path, key=None):
         path = os.path.join(base_dir, path)
         if not VaultManager.is_safe_path(path, base_dir):
             self._set_headers(404)
@@ -97,8 +98,13 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         try:
             ext = path.split(".")[-1]
             (mime, is_binary) = get_type(ext)
+
             with open(path, 'rb' if is_binary else 'r') as f:
                 data = f.read()
+
+            if key is not None:
+                data = AESCipher.decrypt(data, key)
+
             self._set_headers(200, mime)
             self._write(data if is_binary else data.encode("utf-8"))
         except:
@@ -109,6 +115,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         path = self._parse_path()
         base_dir = SERVER_DIR
         is_file = re.search(r'\.[^/]+$', path) is not None
+        key = None
 
         # path in vault
         if path.startswith('/files'):
@@ -131,7 +138,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         if path.startswith('/'):
             path = path[1:]
 
-        self._try_get_resource(base_dir, path)
+        self._try_get_resource(base_dir, path, key)
 
     # Called on POST request
     def do_POST(self):
@@ -171,12 +178,24 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json_error(403, "Forbidden")
                     return
 
+                if VaultManager.is_path_locked(path):
+                    if 'key' not in form or not VaultManager.is_key_valid(path, form['key'].value):
+                        self._send_json_error(403, "Forbidden")
+                        return
+
                 success = VaultManager.delete_path(path)
                 if not success:
                     self._send_json_error(500, "Error deleting " + path)
                     return
 
             elif command == 'upload':
+                key = None
+                if VaultManager.is_path_locked(path):
+                    if 'key' not in form or not VaultManager.is_key_valid(path, form['key'].value):
+                        self._send_json_error(403, "Forbidden")
+                        return
+                    key = form['key'].value
+
                 files = form['files']
                 if not isinstance(files, list):
                     files = [files]
@@ -188,13 +207,20 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                         self._send_json_error(400, filename + " format not supported")
                         return
 
-                    VaultManager.add_file(path, filename, file.file.read())
+                    VaultManager.add_file(path, filename, file.file.read(), key)
 
             elif command == 'encrypt':
                 success = VaultManager.encrypt_folder(path, form['key'].value)
                 if not success:
                     self._send_json_error(400, "Path contains an encrypted folder")
                     return
+
+            elif command == 'verify':
+                success = VaultManager.is_key_valid(path, form['key'].value)
+                response = { 'success': success }
+                self._set_headers(200, 'application/json')
+                self._write(json.dumps(response).encode("utf-8"))
+                return
 
             elif command == 'decrypt':
                 success = VaultManager.decrypt_folder(path, form['key'].value)

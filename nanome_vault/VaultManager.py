@@ -40,7 +40,7 @@ def get_locked_path(path):
         subpath = os.path.join(subpath, part)
         path = os.path.join(FILES_DIR, subpath)
         if os.path.exists(os.path.join(path, '.locked')):
-            return subpath
+            return subpath + '/'
     return None
 
 # checks if folder encrypted
@@ -67,7 +67,7 @@ def list_path(path=None):
 
     result = dict()
     result['locked_path'] = get_locked_path(path)
-    result['locked_folders'] = []
+    result['locked'] = []
     result['folders'] = []
     result['files'] = []
 
@@ -79,7 +79,7 @@ def list_path(path=None):
     for item in sorted(items):
         is_dir = os.path.isdir(os.path.join(path, item))
         if is_dir and os.path.exists(os.path.join(path, item, '.locked')):
-            result['locked_folders'].append(item)
+            result['locked'].append(item)
         result['folders' if is_dir else 'files'].append(item)
 
     return result
@@ -106,10 +106,12 @@ def delete_path(path):
     except:
         return False
 
-# TODO: add key to add to locked path
 # add data to vault at path/filename, where filename can contain a path
-def add_file(path, filename, data):
+def add_file(path, filename, data, key=None):
     path = get_vault_path(path)
+
+    if key is not None:
+        data = AESCipher.encrypt(data, key)
 
     # create folder paths
     subfolder = os.path.join(path, os.path.dirname(filename))
