@@ -153,8 +153,12 @@ const API = {
     return sendCommand(path, 'delete', { key })
   },
 
-  create(path) {
-    return sendCommand(path, 'create')
+  create(path, key) {
+    return sendCommand(path, 'create', { key })
+  },
+
+  rename(path, key, name) {
+    return sendCommand(path, 'rename', { key, name })
   },
 
   encrypt(path, key) {

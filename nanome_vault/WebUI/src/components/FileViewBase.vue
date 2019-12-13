@@ -7,6 +7,7 @@ export default {
   },
 
   data: () => ({
+    loading: true,
     locked: [],
     folders: [],
     files: []
@@ -30,15 +31,17 @@ export default {
   methods: {
     async refresh(newPath) {
       if (this.beforeRefresh && newPath) this.beforeRefresh()
+      this.loading = true
 
       try {
         const data = await API.getFolder(this.path)
         this.locked = data.locked
         this.folders = data.folders
         this.files = data.files
+        this.loading = false
       } catch (e) {
         if (e.code === 403) {
-          const unlocked = await this.unlockFolder(this.path)
+          const unlocked = await this.unlockFolder()
           if (unlocked) {
             this.refresh()
             return
@@ -49,22 +52,26 @@ export default {
       }
     },
 
-    contextmenu(event, item, locked = false) {
+    contextmenu(event, item, encrypted = false) {
       event.stopPropagation()
       this.$root.$emit('contextmenu', {
         event,
         path: this.path + item,
-        locked,
+        locked: this.isLocked(item),
+        encrypted,
         component: this
       })
     },
 
     isLocked(folder) {
+      folder = folder.replace(/\/$/, '')
       const path = this.path + folder
-      return this.locked.includes(folder) && !API.keys.get(path)
+      const noKey = !API.keys.get(path)
+      const isLocked = this.loading || this.locked.includes(folder)
+      return noKey && isLocked
     },
 
-    async unlockFolder(folder) {
+    async unlockFolder(folder = '') {
       const path = this.path + folder
       if (!this.isLocked(folder)) {
         return true

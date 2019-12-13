@@ -1,6 +1,7 @@
 <template>
   <div
-    class="file-view-grid-view pt-4 text-xl"
+    v-if="!loading"
+    class="file-view-grid pt-4 text-xl"
     :class="{ grid: files.length || folders.length }"
   >
     <template v-for="folder in folders">
@@ -111,7 +112,7 @@ export default {
 </script>
 
 <style lang="scss">
-.file-view-grid-view {
+.file-view-grid {
   grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
 
   .icon {

@@ -34,6 +34,7 @@ def get_type(format):
 
 POST_REQS = {
     'upload': ['files'],
+    'rename': ['name'],
     'encrypt': ['key'],
     'verify': ['key'],
     'decrypt': ['key']
@@ -163,57 +164,61 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         # check if missing any required form data
         missing = [req for req in POST_REQS.get(command, []) if req not in form]
         if missing:
-            self._send_json_error(400, "Missing required values: %s" % ', '.join(missing))
+            self._send_json_error(400, f"Missing required values: {', '.join(missing)}")
             return
+
+        def check_auth(path, form):
+            if VaultManager.is_path_locked(path):
+                if 'key' not in form or not VaultManager.is_key_valid(path, form['key'].value):
+                    self._send_json_error(403, "Forbidden")
+                    return False
+            return True
+
+        def check_error(success, error_message, error_code=500):
+            if success:
+                self._send_json_success()
+            else:
+                self._send_json_error(error_code, error_message)
 
         try:
             if command == 'create':
+                if not check_auth(path, form): return
                 success = VaultManager.create_path(path)
-                if not success:
-                    self._send_json_error(400, "Path already exists")
-                    return
+                check_error(success, "Path already exists", 400)
 
             elif command == 'delete':
                 if not path or path == 'shared':
                     self._send_json_error(403, "Forbidden")
                     return
 
-                if VaultManager.is_path_locked(path):
-                    if 'key' not in form or not VaultManager.is_key_valid(path, form['key'].value):
-                        self._send_json_error(403, "Forbidden")
-                        return
-
+                if not check_auth(path, form): return
                 success = VaultManager.delete_path(path)
-                if not success:
-                    self._send_json_error(500, "Error deleting " + path)
-                    return
+                check_error(success, f"Error deleting {path}")
+
+            elif command == 'rename':
+                if not check_auth(path, form): return
+                success = VaultManager.rename_path(path, form['name'].value)
+                check_error(success, f"Error renaming {path}")
 
             elif command == 'upload':
-                key = None
-                if VaultManager.is_path_locked(path):
-                    if 'key' not in form or not VaultManager.is_key_valid(path, form['key'].value):
-                        self._send_json_error(403, "Forbidden")
-                        return
-                    key = form['key'].value
+                if not check_auth(path, form): return
+                key = form['key'].value if 'key' in form else None
 
                 files = form['files']
                 if not isinstance(files, list):
                     files = [files]
 
+                unsupported = [file.filename for file in files if not VaultServer.file_filter(file.filename)]
+                if unsupported:
+                    self._send_json_error(400, f"Format not supported: {', '.join(unsupported)}")
+                    return
+
                 for file in files:
-                    filename = file.filename
-
-                    if not VaultServer.file_filter(filename):
-                        self._send_json_error(400, filename + " format not supported")
-                        return
-
-                    VaultManager.add_file(path, filename, file.file.read(), key)
+                    VaultManager.add_file(path, file.filename, file.file.read(), key)
 
             elif command == 'encrypt':
                 success = VaultManager.encrypt_folder(path, form['key'].value)
-                if not success:
-                    self._send_json_error(400, "Path contains an encrypted folder")
-                    return
+                check_error(success, "Path contains an encrypted folder", 400)
 
             elif command == 'verify':
                 success = VaultManager.is_key_valid(path, form['key'].value)
@@ -224,15 +229,11 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
 
             elif command == 'decrypt':
                 success = VaultManager.decrypt_folder(path, form['key'].value)
-                if not success:
-                    self._send_json_error(403, "Forbidden")
-                    return
+                check_error(success, "Forbidden", 403)
 
             else:
                 self._send_json_error(400, "Invalid command")
                 return
-
-            self._send_json_success()
 
         except VaultManager.InvalidPathError:
             self._send_json_error(404, "Not found")

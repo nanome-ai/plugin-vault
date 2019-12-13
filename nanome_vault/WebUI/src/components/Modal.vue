@@ -59,7 +59,7 @@
           @click="ok"
           class="btn"
           :class="options.okClass"
-          :disabled="loading"
+          :disabled="okDisabled"
         >
           {{ options.okTitle }}
         </button>
@@ -75,9 +75,9 @@ const defaults = {
   body: '',
   default: '',
   okTitle: 'ok',
-  okClass: '',
+  okClass: 'primary',
   cancelTitle: 'cancel',
-  cancelClass: 'danger',
+  cancelClass: '',
   password: false
 }
 
@@ -100,21 +100,25 @@ export default {
     showing: false,
     error: false,
     loading: false,
-    options: {
-      type: 'login',
-      title: 'title',
-      body: 'body',
-      default: '',
-      okTitle: 'ok',
-      okClass: '',
-      cancelTitle: 'cancel',
-      cancelClass: 'danger',
-      password: false
-    },
+    options: {},
     input1: '',
     input2: '',
     deferred: deferred()
   }),
+
+  computed: {
+    okDisabled() {
+      if (this.loading) return true
+
+      if (this.options.type === 'login') {
+        return !this.input1 || !this.input2
+      } else if (this.options.type === 'prompt') {
+        return !this.input1
+      }
+
+      return false
+    }
+  },
 
   mounted() {
     document.body.addEventListener('keydown', this.onKeydown)
@@ -144,7 +148,7 @@ export default {
         this.$nextTick(() => {
           const input = this.$refs.prompt
           input.focus()
-          input.setSelectionRange(0, input.value.length)
+          input.setSelectionRange(0, input.value.lastIndexOf('.'))
         })
       } else if (this.options.type === 'login') {
         this.$nextTick(() => this.$refs.login.focus())
@@ -157,6 +161,7 @@ export default {
     alert(options) {
       return this.show({
         type: 'alert',
+        okClass: '',
         ...options
       })
     },
@@ -205,6 +210,8 @@ export default {
     },
 
     ok() {
+      if (this.okDisabled) return
+
       let data
       if (this.options.type === 'confirm') {
         data = true

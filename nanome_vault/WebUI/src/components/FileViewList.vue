@@ -1,5 +1,5 @@
 <template>
-  <div class="file-view-list-view text-xl">
+  <div v-if="!loading" class="file-view-list text-xl">
     <ul v-if="files.length || folders.length" class="w-full">
       <template v-for="folder in folders">
         <li :key="folder" class="p-2 flex items-center">
@@ -136,8 +136,6 @@ import API from '@/api'
 export default {
   extends: FileViewBase,
 
-  name: 'file-view-list',
-
   components: {
     FileViewList
   },
@@ -183,7 +181,7 @@ export default {
 </script>
 
 <style lang="scss">
-.file-view-list-view {
+.file-view-list {
   .file {
     @apply flex items-center w-full;
   }

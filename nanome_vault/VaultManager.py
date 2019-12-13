@@ -106,6 +106,18 @@ def delete_path(path):
     except:
         return False
 
+# renames a file/folder at path and returns True on success, False on error
+def rename_path(path, name):
+    oldpath = get_vault_path(path)
+    dir = os.path.dirname(oldpath)
+    newpath = os.path.join(dir, name)
+
+    try:
+        os.rename(oldpath, newpath)
+        return True
+    except:
+        return False
+
 # add data to vault at path/filename, where filename can contain a path
 def add_file(path, filename, data, key=None):
     path = get_vault_path(path)
