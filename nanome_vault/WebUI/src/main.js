@@ -27,16 +27,19 @@ Vue.directive('click-out', {
   bind(el, binding, vnode) {
     el.data = {
       stop: e => e.stopPropagation(),
-      event: () => vnode.context[binding.expression]()
+      event: () => vnode.context[binding.expression](),
+      esc: e => e.key === 'Escape' && el.data.event()
     }
 
     setTimeout(() => {
       document.body.addEventListener('click', el.data.event)
+      document.body.addEventListener('keydown', el.data.esc)
       el.addEventListener('click', el.data.stop)
     }, 0)
   },
   unbind(el) {
     document.body.removeEventListener('click', el.data.event)
+    document.body.removeEventListener('keydown', el.data.esc)
     el.removeEventListener('click', el.data.stop)
   }
 })
