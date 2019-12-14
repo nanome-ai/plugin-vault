@@ -1,0 +1,1 @@
+docker build -f vault.Dockerfile -t vault:latest ..
