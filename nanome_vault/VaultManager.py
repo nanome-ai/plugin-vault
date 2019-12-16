@@ -76,7 +76,7 @@ def list_path(path=None):
         return result
 
     items = [item for item in os.listdir(path) if not item.startswith('.')]
-    for item in sorted(items):
+    for item in sorted(items, key=lambda s: s.lower()):
         is_dir = os.path.isdir(os.path.join(path, item))
         if is_dir and os.path.exists(os.path.join(path, item, '.locked')):
             result['locked'].append(item)
@@ -120,7 +120,7 @@ def rename_path(path, name):
 
 # add data to vault at path/filename, where filename can contain a path
 def add_file(path, filename, data, key=None):
-    path = get_vault_path(path)
+    path = get_vault_path(path, enforce_exists=False)
 
     if key is not None:
         data = AESCipher.encrypt(data, key)

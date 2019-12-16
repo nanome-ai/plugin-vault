@@ -1,3 +1,10 @@
+import sys
+import os
+import socket
+import tempfile
+from functools import partial
+from timeit import default_timer as timer
+
 import nanome
 from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
@@ -6,23 +13,24 @@ from nanome.api.structure import Complex
 from .VaultServer import VaultServer
 from .Menu.MenuManager import MenuManager, PageTypes
 from .PPTConverter import PPTConverter
-import sys
-import os
-import socket
-from functools import partial
-from timeit import default_timer as timer
+from . import VaultManager
 
 DEFAULT_SERVER_PORT = 80
 DEFAULT_KEEP_FILES_DAYS = 0
-FILES_DIR = os.path.expanduser('~/Documents/nanome-vault')
+
+EXTENSIONS = {
+    "PDB": ".pdb",
+    "SDF": ".sdf",
+    "MMCIF": ".cif",
+}
 
 # Plugin instance (for Nanome)
 class Vault(nanome.PluginInstance):
     def start(self):
         self.running = False
         self.ppt_readers = {}
-        self.current_dir = FILES_DIR
         self.account = 'user-00000000'
+        self.menu_manager = MenuManager(self, Vault.get_server_url())
         self.on_run()
 
     def update(self):
@@ -34,7 +42,7 @@ class Vault(nanome.PluginInstance):
                 for ppt_reader in self.ppt_readers.values():
                     ppt_reader.update()
 
-                self.__refresh()
+                self.menu_manager.home_page.Update()
                 self.__timer = timer()
 
         if timer() - self.big_timer >= 600:
@@ -46,50 +54,13 @@ class Vault(nanome.PluginInstance):
             self.ppt_readers = filtered_ppt_readers
             self.big_timer = timer()
 
-    def __refresh(self):
-        items = os.listdir(self.current_dir)
-
-        def isdir(item):
-            return os.path.isdir(os.path.join(self.current_dir, item))
-
-        files = []
-        folders = []
-        can_upload = True
-
-        if self.current_dir != FILES_DIR:
-            lowercase = lambda s: s.lower()
-            files = sorted([item for item in items if not isdir(item) and VaultServer.file_filter(item)], key=lowercase)
-            folders = sorted([item for item in items if isdir(item)], key=lowercase)
-        else:
-            folders = ['shared', self.account]
-            can_upload = False
-
-        self.menu_manager.UpdateList(files, folders, can_upload)
-
-    def chdir(self, folder):
-        self.menu_manager.ClearList()
-        self.current_dir = os.path.abspath(os.path.join(self.current_dir, folder))
-
-        common = os.path.commonprefix((FILES_DIR, self.current_dir))
-        if common != FILES_DIR:
-            self.current_dir = FILES_DIR
-        at_root = self.current_dir == FILES_DIR
-
-        # calculate breadcrumbs
-        subpath = self.current_dir[len(FILES_DIR) + 1 :]
-        subpath = subpath.replace(self.account, 'account')
-        path = 'files / ' + subpath.replace('/', ' / ')
-        self.menu_manager.home_page.UpdateBreadcrumbs(path, at_root)
-
-        self.__refresh()
-
     def on_run(self):
         self.running = True
-        self.menu_manager = MenuManager(self, Vault.get_server_url(), self.load_molecule)
-        self.chdir('.')
         self.__timer = timer()
         self.big_timer = timer()
         self.on_presenter_change()
+        self.menu_manager.Refresh()
+        self.menu_manager.home_page.OpenFolder('.')
 
     def on_presenter_change(self):
         self.request_presenter_info(self.update_account)
@@ -99,45 +70,71 @@ class Vault(nanome.PluginInstance):
             return
 
         self.account = info.account_id
-        account_dir = os.path.join(FILES_DIR, self.account)
-        if not os.path.exists(account_dir):
-            os.makedirs(account_dir)
-        self.__refresh()
+        VaultManager.create_path(self.account)
+        self.menu_manager.home_page.Update()
 
-    def load_molecule(self, name, callback=None):
-        complex_name = '.'.join(name.split(".")[:-1])
+    def load_file(self, name, callback=None):
+        item_name = '.'.join(name.split(".")[:-1])
         extension = name.split(".")[-1]
-        file_path = os.path.join(self.current_dir, name)
+
+        path = self.menu_manager.home_page.path
+        file_path = VaultManager.get_vault_path(os.path.join(path, name))
+
+        temp = None
+        if self.menu_manager.home_page.locked_path:
+            key = self.menu_manager.home_page.folder_key
+            temp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
+            VaultManager.decrypt_file(file_path, key, temp.name)
+            file_path = temp.name
 
         if extension == "pdb":
             complex = Complex.io.from_pdb(path=file_path)
-            complex.name = complex_name
+            complex.name = item_name
             self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
         elif extension == "sdf":
             complex = Complex.io.from_sdf(path=file_path)
-            complex.name = complex_name
+            complex.name = item_name
             self.bonds_ready([complex], callback)
         elif extension == "cif":
             complex = Complex.io.from_mmcif(path=file_path)
-            complex.name = complex_name
+            complex.name = item_name
             self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
         elif extension in ["ppt", "pptx", "odp", "pdf"]:
             self.display_ppt(file_path, callback)
         elif extension in ["png", "jpg"]:
-            self.display_image(file_path, callback)
+            self.display_image(item_name, file_path, callback)
         else:
             Logs.warning("Unknown file extension for file", name)
+
+        if temp:
+            temp.close()
+            os.remove(temp.name)
+
+    def save_file(self, save_type, complex):
+        extension = EXTENSIONS.get(save_type)
+        if not extension:
+            Logs.warning("Unknown file type", save_type)
             return
 
-    def save_molecule(self, save_type, complex):
-        path = os.path.join(self.current_dir, complex.name)
+        temp = tempfile.NamedTemporaryFile(delete=False, suffix=extension)
+        complex_path = temp.name
 
         if save_type == "PDB":
-            complex.io.to_pdb(path + ".pdb")
+            complex.io.to_pdb(complex_path)
         elif save_type == "SDF":
-            complex.io.to_sdf(path + ".sdf")
+            complex.io.to_sdf(complex_path)
         elif save_type == "MMCIF":
-            complex.io.to_mmcif(path + ".cif")
+            complex.io.to_mmcif(complex_path)
+
+        path = VaultManager.get_vault_path(self.menu_manager.home_page.path)
+        file_name = complex.name + extension
+        key = self.menu_manager.home_page.folder_key
+
+        with open(complex_path, 'rb') as f:
+            VaultManager.add_file(path, file_name, f.read(), key)
+
+        temp.close()
+        os.remove(temp.name)
 
         self.send_notification(NotificationTypes.success, complex.name + " saved")
 
@@ -181,16 +178,17 @@ class Vault(nanome.PluginInstance):
                 self.menu_manager.OpenPage(PageTypes.Image, images[0], file_name)
             elif len(images) > 1:
                 self.menu_manager.OpenPage(PageTypes.PPT, images, file_name)
-            callback()
+            if callback:
+                callback()
         def error_delegate():
             #cleanup ppt_reader
             pass
         ppt_reader.Convert(done_delegate, error_delegate)
 
-    def display_image(self, path, callback):
-        name = os.path.basename(path)
+    def display_image(self, name, path, callback):
         self.menu_manager.OpenPage(PageTypes.Image, path, name)
-        callback()
+        if callback:
+            callback()
 
 def main():
     # Plugin server (for Web)
