@@ -149,7 +149,6 @@ const API = {
   },
 
   delete(path, key) {
-    key = key || API.keys.get(path)
     return sendCommand(path, 'delete', { key })
   },
 
