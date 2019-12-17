@@ -105,7 +105,7 @@
           <fa-text
             class="text-white"
             transform="down-4 shrink-12"
-            :value="file.ext"
+            :value="file.ext.substr(0, 4)"
           />
         </fa-layers>
         <div class="truncate">{{ file.full }}</div>
