@@ -83,7 +83,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self._write(json.dumps(response).encode("utf-8"))
 
     # Special GET case: get file list
-    def _send_list(self, folder=None):
+    def _send_list(self, path=None):
         if self.keep_files_days > 0:
             self.file_cleanup()
 
