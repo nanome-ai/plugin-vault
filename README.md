@@ -6,6 +6,8 @@ Nanome Vault will start a web server. Other people can upload molecules or other
 
 Nanome Vault currently supports:
 
+- Workspaces: .nanome
+- Macros: .lua
 - Molecules: .pdb, .cif, .sdf
 - Presentations: .pptx, .ppt, .odp
 - Documents: .pdf
