@@ -165,11 +165,8 @@ class MenuManager(object):
             self.upload_button = self.base.find_node("UploadButton").get_content()
             self.upload_button.register_pressed_callback(self.ToggleUpload)
 
-            self.ins_add_files = "Visit %s in browser to add files" % address
-            self.ins_select_complex = "Select a structure from the workspace"
-
             self.instructions = self.base.find_node("InstructionLabel").get_content()
-            self.instructions.text_value = self.ins_add_files
+            self.instructions.text_value = "Visit %s in browser to add files" % address
             self.breadcrumbs = self.base.find_node("Breadcrumbs").get_content()
 
             # file explorer components
@@ -182,21 +179,6 @@ class MenuManager(object):
             ln_file_loading = self.base.find_node("FileLoading")
             self.file_loading = ln_file_loading.get_content()
             self.file_loading.parent = ln_file_loading
-
-            # upload components
-            self.file_upload = self.base.find_node("FileUpload")
-            self.panel_list = self.base.find_node("SelectComplex")
-            self.panel_upload = self.base.find_node("SelectType")
-
-            button_pdb = self.base.find_node("PDB").get_content()
-            button_pdb.register_pressed_callback(partial(self.UploadComplex, "PDB"))
-            button_sdf = self.base.find_node("SDF").get_content()
-            button_sdf.register_pressed_callback(partial(self.UploadComplex, "SDF"))
-            button_mmcif = self.base.find_node("MMCIF").get_content()
-            button_mmcif.register_pressed_callback(partial(self.UploadComplex, "MMCIF"))
-
-            self.complex_list = self.base.find_node("ComplexList").get_content()
-            self.selected_complex = None
 
             # unlock components
             self.ln_unlock = self.base.find_node("UnlockFolder")
@@ -212,6 +194,49 @@ class MenuManager(object):
             self.locked_path = None
             self.folder_key = None
             self.folder_to_unlock = None
+
+            # upload components
+            self.ln_upload = self.base.find_node("FileUpload")
+
+            self.selected_upload_button = None
+            button_workspace = self.base.find_node("UploadTypeWorkspace").get_content()
+            button_workspace.name = "workspace"
+            button_workspace.register_pressed_callback(self.SelectUploadType)
+            button_structure = self.base.find_node("UploadTypeStructure").get_content()
+            button_structure.name = "structure"
+            button_structure.register_pressed_callback(self.SelectUploadType)
+            button_macro = self.base.find_node("UploadTypeMacro").get_content()
+            button_macro.name = "macro"
+            button_macro.register_pressed_callback(self.SelectUploadType)
+
+            self.ln_upload_message = self.base.find_node("UploadMessage")
+            self.lbl_upload_message = self.ln_upload_message.get_content()
+
+            ln_upload_list = self.base.find_node("UploadList")
+            self.lst_upload = ln_upload_list.get_content()
+            self.lst_upload.parent = ln_upload_list
+
+            self.ln_upload_workspace = self.base.find_node("UploadWorkspace")
+            self.inp_workspace_name = self.base.find_node("UploadWorkspaceName").get_content()
+            button_workspace_continue = self.base.find_node("UploadWorkspaceContinue").get_content()
+            button_workspace_continue.register_pressed_callback(self.UploadWorkspace)
+
+            self.ln_upload_complex_type = self.base.find_node("UploadComplexType")
+            button_pdb = self.base.find_node("PDB").get_content()
+            button_pdb.register_pressed_callback(partial(self.UploadComplex, "pdb"))
+            button_sdf = self.base.find_node("SDF").get_content()
+            button_sdf.register_pressed_callback(partial(self.UploadComplex, "sdf"))
+            button_mmcif = self.base.find_node("MMCIF").get_content()
+            button_mmcif.register_pressed_callback(partial(self.UploadComplex, "cif"))
+
+            self.ln_upload_confirm = self.base.find_node("UploadConfirm")
+            self.lbl_upload_confirm = self.base.find_node("UploadConfirmLabel").get_content()
+            button_confirm = self.base.find_node("UploadConfirmButton").get_content()
+            button_confirm.register_pressed_callback(self.ConfirmUpload)
+
+            self.upload_item = None
+            self.upload_name = None
+            self.upload_ext = None
 
             self.select()
 
@@ -263,14 +288,16 @@ class MenuManager(object):
                 changed = True
 
             # iterate list to preserve ordering
-            for item in [i for i in new_items if i in add_items]:
-                self.AddItem(item, item in folders)
+            for index, item in enumerate(new_items):
+                if item not in add_items:
+                    continue
+                self.AddItem(item, item in folders, index)
                 changed = True
 
             if changed or not len(old_items):
                 MenuManager.RefreshMenu(self.file_list)
 
-        def AddItem(self, name, is_folder):
+        def AddItem(self, name, is_folder, index=None):
             new_item = Prefabs.list_item_prefab.clone()
             new_item.name = name
             button = new_item.find_node("ButtonNode").get_content()
@@ -301,7 +328,11 @@ class MenuManager(object):
 
             cb = FolderPressedCallback if is_folder else FilePressedCallback
             button.register_pressed_callback(cb)
-            self.file_list.items.append(new_item)
+
+            if index is None:
+                self.file_list.items.append(new_item)
+            else:
+                self.file_list.items.insert(index, new_item)
 
         def RemoveItem(self, name):
             items = self.file_list.items
@@ -343,57 +374,160 @@ class MenuManager(object):
         def CancelOpenLocked(self, button=None):
             self.file_explorer.enabled = True
             self.ln_unlock.enabled = False
-            # if button is not None:
             MenuManager.RefreshMenu()
 
         def ToggleUpload(self, button=None, show=None):
             show = not self.showing_upload if show is None else show
             self.showing_upload = show
-            self.file_upload.enabled = show
+            self.ln_upload.enabled = show
+            self.ln_upload_confirm.enabled = False
+            self.ln_upload_message.enabled = show
             self.file_explorer.enabled = not show
             self.upload_button.set_all_text('Cancel' if show else 'Upload Here')
-            self.instructions.text_value = self.ins_select_complex if show else self.ins_add_files
 
-            if show:
-                self.plugin.request_complex_list(self.PopulateComplexes)
-                self.panel_list.enabled = True
-                self.panel_upload.enabled = False
+            self.SelectUploadType()
+            MenuManager.RefreshMenu()
+
+        def ResetUpload(self):
+            self.ShowUploadMessage()
+
+            self.upload_item = None
+            self.upload_name = None
+            self.upload_ext = None
+
+            self.ln_upload_message.enabled = True
+            self.ln_upload_workspace.enabled = False
+            self.lst_upload.parent.enabled = False
+            self.ln_upload_complex_type.enabled = False
+            self.ln_upload_confirm.enabled = False
+
+            self.lst_upload.items.clear()
+            MenuManager.RefreshMenu(self.lst_upload)
+
+        def SelectUploadType(self, button=None):
+            if self.selected_upload_button:
+                self.selected_upload_button.selected = False
+                MenuManager.RefreshMenu(self.selected_upload_button)
+                self.selected_upload_button = None
+
+            self.ResetUpload()
+
+            if not button:
+                return
+
+            self.selected_upload_button = button
+            self.selected_upload_button.selected = True
+            self.ln_upload_message.enabled = False
+
+            if button.name == 'workspace':
+                self.ln_upload_workspace.enabled = True
+                self.inp_workspace_name.text_value = ''
+            elif button.name == 'structure':
+                self.lst_upload.parent.enabled = True
+                self.ShowUploadComplex()
+            elif button.name == 'macro':
+                self.lst_upload.parent.enabled = True
+                self.ShowUploadMacro()
 
             MenuManager.RefreshMenu()
 
-        def PopulateComplexes(self, complexes):
+        def UploadWorkspace(self, button=None):
+            name = self.inp_workspace_name.input_text
+            if not name:
+                return
+
+            def on_workspace(workspace):
+                self.upload_item = workspace
+                self.upload_name = name
+                self.upload_ext = 'nanome'
+                self.ln_upload_workspace.enabled = False
+                self.ShowUploadConfirm()
+
+            self.plugin.request_workspace(on_workspace)
+
+        def ShowUploadMacro(self):
+            def select_macro(button):
+                self.upload_item = button.macro
+                self.upload_name = button.macro.title
+                self.upload_ext = 'lua'
+                self.lst_upload.parent.enabled = False
+                self.ShowUploadConfirm()
+
+            def on_macro_list(macros):
+                self.lst_upload.items = []
+                for macro in macros:
+                    item = Prefabs.list_item_prefab.clone()
+                    label = item.find_node("LabelNode").get_content()
+                    label.text_value = macro.title
+                    button = item.find_node("ButtonNode").get_content()
+                    button.macro = macro
+                    button.register_pressed_callback(select_macro)
+                    self.lst_upload.items.append(item)
+
+                if not macros:
+                    self.lst_upload.parent.enabled = False
+                    self.ShowUploadMessage('no macros found')
+                else:
+                    MenuManager.RefreshMenu(self.lst_upload)
+
+            nanome.api.macro.Macro.get_live(on_macro_list)
+
+        def ShowUploadComplex(self):
             def select_complex(button):
-                self.selected_complex = button.complex
-                self.panel_list.enabled = False
-                self.panel_upload.enabled = True
+                self.upload_item = button.complex
+                self.lst_upload.parent.enabled = False
+                self.ln_upload_complex_type.enabled = True
                 MenuManager.RefreshMenu()
 
-            self.complex_list.items = []
-            for complex in complexes:
-                item = Prefabs.list_item_prefab.clone()
-                label = item.find_node("LabelNode").get_content()
-                label.text_value = complex.full_name
-                button = item.find_node("ButtonNode").get_content()
-                button.complex = complex
-                button.register_pressed_callback(select_complex)
-                self.complex_list.items.append(item)
+            def on_complex_list(complexes):
+                self.lst_upload.items = []
+                for complex in complexes:
+                    item = Prefabs.list_item_prefab.clone()
+                    label = item.find_node("LabelNode").get_content()
+                    label.text_value = complex.full_name
+                    button = item.find_node("ButtonNode").get_content()
+                    button.complex = complex
+                    button.register_pressed_callback(select_complex)
+                    self.lst_upload.items.append(item)
 
-            if not complexes:
-                # empty ln for spacing
-                self.complex_list.items.append(nanome.ui.LayoutNode())
-                ln = nanome.ui.LayoutNode()
-                lbl = ln.add_new_label("no structures found in workspace")
-                lbl.text_horizontal_align = lbl.HorizAlignOptions.Middle
-                lbl.text_max_size = 0.4
-                self.complex_list.items.append(ln)
+                if not complexes:
+                    self.lst_upload.parent.enabled = False
+                    self.ShowUploadMessage('no structures found')
+                else:
+                    MenuManager.RefreshMenu(self.lst_upload)
 
-            MenuManager.RefreshMenu(self.complex_list)
+            self.plugin.request_complex_list(on_complex_list)
 
-        def UploadComplex(self, save_type, button):
-            def save_func(complexes):
-                self.plugin.save_file(save_type, complexes[0])
-                self.ToggleUpload(show=False)
-            self.plugin.request_complexes([self.selected_complex.index], save_func)
+        def UploadComplex(self, extension, button):
+            def on_complexes(complexes):
+                complex = complexes[0]
+                self.upload_item = complex
+                self.upload_name = complex.name
+                self.upload_ext = extension
+                self.ln_upload_complex_type.enabled = False
+                self.ShowUploadConfirm()
+
+            self.plugin.request_complexes([self.upload_item.index], on_complexes)
+
+        def ShowUploadMessage(self, message=None):
+            self.ln_upload_message.enabled = True
+
+            if message is None:
+                self.lbl_upload_message.text_value = 'select an item to upload'
+                return
+
+            self.lbl_upload_message.text_value = message
+            MenuManager.RefreshMenu()
+
+        def ShowUploadConfirm(self):
+            self.ln_upload_confirm.enabled = True
+            self.lbl_upload_confirm.text_value = f'upload {self.upload_name}.{self.upload_ext}?'
+            MenuManager.RefreshMenu()
+
+        def ConfirmUpload(self, button):
+            self.plugin.save_file(self.upload_item, self.upload_name, self.upload_ext)
+            self.ToggleUpload(show=False)
+            self.Update()
 
     class ImagePage(Page):
         def __init__(self, image, name):

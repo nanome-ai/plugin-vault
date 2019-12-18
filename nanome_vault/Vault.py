@@ -13,20 +13,17 @@ from nanome.api.structure import Complex
 from .VaultServer import VaultServer
 from .Menu.MenuManager import MenuManager, PageTypes
 from .PPTConverter import PPTConverter
-from . import VaultManager
+from . import VaultManager, Workspace
 
 DEFAULT_SERVER_PORT = 80
 DEFAULT_KEEP_FILES_DAYS = 0
 
-EXTENSIONS = {
-    "PDB": ".pdb",
-    "SDF": ".sdf",
-    "MMCIF": ".cif",
-}
-
 # Plugin instance (for Nanome)
 class Vault(nanome.PluginInstance):
     def start(self):
+        # set to empty string to read/write macros in Macros folder
+        nanome.api.macro.Macro.set_plugin_identifier('')
+
         self.running = False
         self.ppt_readers = {}
         self.account = 'user-00000000'
@@ -73,7 +70,7 @@ class Vault(nanome.PluginInstance):
         VaultManager.create_path(self.account)
         self.menu_manager.home_page.Update()
 
-    def load_file(self, name, callback=None):
+    def load_file(self, name, callback):
         item_name = '.'.join(name.split(".")[:-1])
         extension = name.split(".")[-1]
 
@@ -87,63 +84,97 @@ class Vault(nanome.PluginInstance):
             VaultManager.decrypt_file(file_path, key, temp.name)
             file_path = temp.name
 
-        if extension == "pdb":
+        msg = None
+
+        # workspace
+        if extension == 'nanome':
+            with open(file_path, 'rb') as f:
+                workspace = Workspace.from_data(f.read())
+                self.update_workspace(workspace)
+            msg = f'Workspace {item_name} loaded'
+            callback()
+
+        # macro
+        elif extension == 'lua':
+            with open(file_path, 'r') as f:
+                macro = nanome.api.macro.Macro()
+                macro.title = item_name
+                macro.logic = f.read()
+                macro.save()
+            msg = f'Macro {item_name} added'
+            callback()
+
+        # structure
+        elif extension == 'pdb':
             complex = Complex.io.from_pdb(path=file_path)
             complex.name = item_name
             self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
-        elif extension == "sdf":
+        elif extension == 'sdf':
             complex = Complex.io.from_sdf(path=file_path)
             complex.name = item_name
             self.bonds_ready([complex], callback)
-        elif extension == "cif":
+        elif extension == 'cif':
             complex = Complex.io.from_mmcif(path=file_path)
             complex.name = item_name
             self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
-        elif extension in ["ppt", "pptx", "odp", "pdf"]:
+
+        # document/image
+        elif extension in ['ppt', 'pptx', 'odp', 'pdf']:
             self.display_ppt(file_path, callback)
-        elif extension in ["png", "jpg"]:
+        elif extension in ['png', 'jpg']:
             self.display_image(item_name, file_path, callback)
+
         else:
-            Logs.warning("Unknown file extension for file", name)
+            error = f'Extension not yet supported: {extension}'
+            self.send_notification(NotificationTypes.error, error)
+            Logs.warning(error)
+            callback()
+
+        if msg is not None:
+            self.send_notification(NotificationTypes.success, msg)
 
         if temp:
             temp.close()
             os.remove(temp.name)
 
-    def save_file(self, save_type, complex):
-        extension = EXTENSIONS.get(save_type)
-        if not extension:
-            Logs.warning("Unknown file type", save_type)
-            return
-
+    def save_file(self, item, name, extension):
         temp = tempfile.NamedTemporaryFile(delete=False, suffix=extension)
-        complex_path = temp.name
 
-        if save_type == "PDB":
-            complex.io.to_pdb(complex_path)
-        elif save_type == "SDF":
-            complex.io.to_sdf(complex_path)
-        elif save_type == "MMCIF":
-            complex.io.to_mmcif(complex_path)
+        # workspace
+        if extension == 'nanome':
+            with open(temp.name, 'wb') as f:
+                f.write(Workspace.to_data(item))
 
-        path = VaultManager.get_vault_path(self.menu_manager.home_page.path)
-        file_name = complex.name + extension
-        key = self.menu_manager.home_page.folder_key
+        # macro
+        elif extension == 'lua':
+            with open(temp.name, 'wb') as f:
+                f.write(item.logic.encode('utf-8'))
 
-        with open(complex_path, 'rb') as f:
+        # structures
+        elif extension == 'pdb':
+            item.io.to_pdb(temp.name)
+        elif extension == 'sdf':
+            item.io.to_sdf(temp.name)
+        elif extension == 'cif':
+            item.io.to_mmcif(temp.name)
+
+        with open(temp.name, 'rb') as f:
+            path = VaultManager.get_vault_path(self.menu_manager.home_page.path)
+            key = self.menu_manager.home_page.folder_key
+            file_name = f'{name}.{extension}'
+
             VaultManager.add_file(path, file_name, f.read(), key)
+            self.send_notification(NotificationTypes.success, f'{file_name} saved')
 
-        temp.close()
+        temp.close() # unsure if needed
         os.remove(temp.name)
 
-        self.send_notification(NotificationTypes.success, complex.name + " saved")
+    def bonds_ready(self, complexes, callback):
+        self.add_dssp(complexes, partial(self.send_complexes, callback=callback))
 
-    def bonds_ready(self, complex_list, callback):
-        self.add_dssp(complex_list, partial(self.send_complexes, callback=callback))
-
-    def send_complexes(self, complex_list, callback):
-        self.add_to_workspace(complex_list)
-        self.send_notification(NotificationTypes.success, complex_list[0].name + " loaded")
+    def send_complexes(self, complexes, callback):
+        self.add_to_workspace(complexes)
+        self.send_notification(NotificationTypes.success, f'{complexes[0].name} loaded')
         callback()
 
     @staticmethod
