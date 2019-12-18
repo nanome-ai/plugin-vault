@@ -52,6 +52,13 @@ On Linux, you might have to start using `sudo nanome-vault` to listen on port 80
 
   The port to use for the Web UI. Example: `-w 8080`
 
+- `-s ssl-certificate`
+
+  SSL certificate to be used for HTTPS. If port is not set, port will default to 443. Example: `-s ./cert.pem`
+
+  To generate a self signed certificate to use for local HTTPS:\
+  `openssl req -new -x509 -keyout cert.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'`
+
 - `-k days`
 
   Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `-k 14`

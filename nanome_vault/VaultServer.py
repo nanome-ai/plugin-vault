@@ -267,13 +267,13 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     os.remove(file_path)
 
 class VaultServer():
-    def __init__(self, url, port, keep_files_days):
+    def __init__(self, port, ssl_cert, url, keep_files_days):
         VaultServer.instance = self
-        self.url = url
         self.port = port
+        self.url = url
         self.keep_files_days = keep_files_days
         self.last_cleanup = datetime.fromtimestamp(0)
-        self.__process = Process(target=VaultServer._start_process, args=(port,))
+        self.__process = Process(target=VaultServer._start_process, args=(port,ssl_cert,))
 
     @staticmethod
     def file_filter(name):
@@ -284,9 +284,14 @@ class VaultServer():
         self.__process.start()
 
     @classmethod
-    def _start_process(cls, port):
+    def _start_process(cls, port, ssl_cert):
         socketserver.TCPServer.allow_reuse_address = True
         server = socketserver.TCPServer(("", port), RequestHandler)
+
+        if ssl_cert is not None:
+            import ssl
+            server.socket = ssl.wrap_socket(server.socket, certfile=ssl_cert, server_side=True)
+
         try:
             server.serve_forever()
         except KeyboardInterrupt:

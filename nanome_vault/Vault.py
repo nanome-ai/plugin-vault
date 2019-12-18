@@ -223,21 +223,28 @@ class Vault(nanome.PluginInstance):
 
 def main():
     # Plugin server (for Web)
+    port = DEFAULT_SERVER_PORT
+    ssl_cert = None
     url = None
-    web_port = DEFAULT_SERVER_PORT
     keep_files_days = DEFAULT_KEEP_FILES_DAYS
 
     try:
         for i in range(len(sys.argv)):
             if sys.argv[i] == "-w":
-                web_port = int(sys.argv[i + 1])
-            elif sys.argv[i] == "-k":
-                keep_files_days = int(sys.argv[i + 1])
+                port = int(sys.argv[i + 1])
+            elif sys.argv[i] == "-s":
+                ssl_cert = sys.argv[i + 1]
             elif sys.argv[i] == "-u":
                 url = sys.argv[i + 1]
+            elif sys.argv[i] == "-k":
+                keep_files_days = int(sys.argv[i + 1])
     except:
         pass
-    server = VaultServer(url, web_port, keep_files_days)
+
+    if ssl_cert is not None and port == DEFAULT_SERVER_PORT:
+        port = 443
+
+    server = VaultServer(port, ssl_cert, url, keep_files_days)
     server.start()
 
     # Plugin
