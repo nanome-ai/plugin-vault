@@ -27,7 +27,7 @@ class Vault(nanome.PluginInstance):
         self.running = False
         self.ppt_readers = {}
         self.account = 'user-00000000'
-        self.menu_manager = MenuManager(self, Vault.get_server_url())
+        self.menu_manager = MenuManager(self, self.get_server_url())
         self.on_run()
 
     def update(self):
@@ -177,26 +177,6 @@ class Vault(nanome.PluginInstance):
         self.send_notification(NotificationTypes.success, f'{complexes[0].name} loaded')
         callback()
 
-    @staticmethod
-    def get_server_url():
-        server = VaultServer.instance
-
-        if server.url != None:
-            return server.url
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            s.connect(('10.255.255.255', 1))
-            ip = s.getsockname()[0]
-        except:
-            ip = '127.0.0.1'
-        finally:
-            s.close()
-
-        if server.port != DEFAULT_SERVER_PORT:
-            ip += ":" + str(server.port)
-        return ip
-
     def display_ppt(self, file_name, callback):
         key = os.path.basename(file_name) + str(os.path.getmtime(file_name))
         if key in self.ppt_readers:
@@ -221,6 +201,23 @@ class Vault(nanome.PluginInstance):
         if callback:
             callback()
 
+    def get_server_url(self):
+        url, port = self.custom_data
+
+        if url is None:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(('10.255.255.255', 1))
+                url = s.getsockname()[0]
+            except:
+                url = '127.0.0.1'
+            finally:
+                s.close()
+
+        if port != DEFAULT_SERVER_PORT:
+            url += ":" + str(port)
+        return url
+
 def main():
     # Plugin server (for Web)
     port = DEFAULT_SERVER_PORT
@@ -244,12 +241,13 @@ def main():
     if ssl_cert is not None and port == DEFAULT_SERVER_PORT:
         port = 443
 
-    server = VaultServer(port, ssl_cert, url, keep_files_days)
+    server = VaultServer(port, ssl_cert, keep_files_days)
     server.start()
 
     # Plugin
     plugin = nanome.Plugin("Nanome Vault", "Use your browser to upload files and folders to make them available in Nanome.", "Loading", False)
     plugin.set_plugin_class(Vault)
+    plugin.set_custom_data(url, port)
     plugin.run('127.0.0.1', 8888)
 
 if __name__ == "__main__":

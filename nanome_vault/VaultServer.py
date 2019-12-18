@@ -9,6 +9,7 @@ import re
 import json
 import shutil
 from datetime import datetime, timedelta
+from functools import partial
 
 import nanome
 from nanome.util import Logs
@@ -44,6 +45,11 @@ SERVER_DIR = os.path.join(os.path.dirname(__file__), 'WebUI/dist')
 
 # Class handling HTTP requests
 class RequestHandler(http.server.BaseHTTPRequestHandler):
+    def __init__(self, keep_files_days, *args, **kwargs):
+        self.last_cleanup = datetime.fromtimestamp(0)
+        self.keep_files_days = keep_files_days
+        super().__init__(*args, **kwargs)
+
     def _parse_path(self):
         try:
             parsed_url = urllib.parse.urlparse(self.path)
@@ -77,8 +83,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self._write(json.dumps(response).encode("utf-8"))
 
     # Special GET case: get file list
-    def _send_list(self, path=None):
-        if VaultServer.instance.keep_files_days > 0:
+    def _send_list(self, folder=None):
+        if self.keep_files_days > 0:
             self.file_cleanup()
 
         try:
@@ -249,14 +255,12 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
 
     # Check file last accessed time and remove those older than 28 days
     def file_cleanup(self):
-        server = VaultServer.instance
-
         # don't execute more than once every 5 min
-        if datetime.today() - server.last_cleanup < timedelta(minutes=5):
+        if datetime.today() - self.last_cleanup < timedelta(minutes=5):
             return
 
-        server.last_cleanup = datetime.today()
-        expiry_date = datetime.today() - timedelta(days=server.keep_files_days)
+        self.last_cleanup = datetime.today()
+        expiry_date = datetime.today() - timedelta(days=self.keep_files_days)
 
         for (dirpath, _, filenames) in os.walk(VaultManager.FILES_DIR):
             for filename in filenames:
@@ -267,13 +271,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     os.remove(file_path)
 
 class VaultServer():
-    def __init__(self, port, ssl_cert, url, keep_files_days):
-        VaultServer.instance = self
-        self.port = port
-        self.url = url
-        self.keep_files_days = keep_files_days
-        self.last_cleanup = datetime.fromtimestamp(0)
-        self.__process = Process(target=VaultServer._start_process, args=(port,ssl_cert,))
+    def __init__(self, port, ssl_cert, keep_files_days):
+        self.__process = Process(target=VaultServer._start_process, args=(port, ssl_cert, keep_files_days))
 
     @staticmethod
     def file_filter(name):
@@ -284,9 +283,11 @@ class VaultServer():
         self.__process.start()
 
     @classmethod
-    def _start_process(cls, port, ssl_cert):
+    def _start_process(cls, port, ssl_cert, keep_files_days):
         socketserver.TCPServer.allow_reuse_address = True
-        server = socketserver.TCPServer(("", port), RequestHandler)
+
+        handler = partial(RequestHandler, keep_files_days)
+        server = socketserver.TCPServer(("", port), handler)
 
         if ssl_cert is not None:
             import ssl
