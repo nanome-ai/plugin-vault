@@ -158,9 +158,9 @@ class MenuManager(object):
             self.up_button.register_pressed_callback(go_up)
 
             self.up_button.unusable = True
-            self.up_button.set_all_icon(UP_ICON_PATH)
+            self.up_button.icon.set_all(UP_ICON_PATH)
             self.up_button.icon.size = 0.5
-            self.up_button.icon.color_unusable = nanome.util.Color.Grey()
+            self.up_button.icon.color.unusable = nanome.util.Color.Grey()
 
             self.upload_button = self.base.find_node("UploadButton").get_content()
             self.upload_button.register_pressed_callback(self.ToggleUpload)
@@ -383,7 +383,7 @@ class MenuManager(object):
             self.ln_upload_confirm.enabled = False
             self.ln_upload_message.enabled = show
             self.file_explorer.enabled = not show
-            self.upload_button.set_all_text('Cancel' if show else 'Upload Here')
+            self.upload_button.text.set_all('Cancel' if show else 'Upload Here')
 
             self.SelectUploadType()
             MenuManager.RefreshMenu()
