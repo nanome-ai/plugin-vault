@@ -11,6 +11,7 @@ PPT_TAB_PATH = DIR_PATH + "/PPTTab.json"
 IMAGE_TAB_PATH = DIR_PATH + "/ImageTab.json"
 LIST_ITEM_PATH = DIR_PATH + "/ListItem.json"
 UP_ICON_PATH = DIR_PATH + "/UpIcon.png"
+LOCK_ICON_PATH = DIR_PATH + "/LockIcon.png"
 
 class Prefabs(object):
     tab_prefab = None
@@ -258,8 +259,15 @@ class MenuManager(object):
         def UpdateBreadcrumbs(self):
             at_root = self.path == '.'
             subpath = '' if at_root else self.path
+
+            parts = subpath.split('/')
+            if len(parts) > 5:
+                del parts[2:-2]
+                parts.insert(2, '...')
+            subpath = '/'.join(parts)
+
             subpath = subpath.replace(self.plugin.account, 'account')
-            path = 'files / ' + subpath.replace('/', ' / ')
+            path = '/ ' + subpath.replace('/', ' / ')
 
             self.breadcrumbs.text_value = path
             MenuManager.RefreshMenu(self.breadcrumbs)
@@ -300,7 +308,8 @@ class MenuManager(object):
         def AddItem(self, name, is_folder, index=None):
             new_item = Prefabs.list_item_prefab.clone()
             new_item.name = name
-            button = new_item.find_node("ButtonNode").get_content()
+            ln_button = new_item.find_node("ButtonNode")
+            button = ln_button.get_content()
             button.item_name = name
 
             display_name = name.replace(self.plugin.account, 'account')
@@ -309,6 +318,12 @@ class MenuManager(object):
 
             if is_folder:
                 label.text_value += '/'
+
+            if is_folder and name in self.locked_folders:
+                label.text_value += ' [locked]'
+                # button.icon.value.set_all(LOCK_ICON_PATH)
+                # button.icon.size = 0.5
+                # button.icon.position.x = 0.9
 
             def FilePressedCallback(button):
                 self.file_list.parent.enabled = False

@@ -193,11 +193,11 @@ export default {
     },
 
     async deleteItem() {
-      const { path, locked } = this.contextmenu
+      const { path, encrypted } = this.contextmenu
       const { isFolder } = this.menuOptions
 
       let key
-      if (locked) {
+      if (encrypted) {
         key = await this.verifyKey(path, 'Delete')
         if (!key) return
       }

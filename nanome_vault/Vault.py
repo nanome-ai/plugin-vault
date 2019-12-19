@@ -91,7 +91,7 @@ class Vault(nanome.PluginInstance):
             with open(file_path, 'rb') as f:
                 workspace = Workspace.from_data(f.read())
                 self.update_workspace(workspace)
-            msg = f'Workspace {item_name} loaded'
+            msg = f'Workspace "{item_name}" loaded'
             callback()
 
         # macro
@@ -101,7 +101,7 @@ class Vault(nanome.PluginInstance):
                 macro.title = item_name
                 macro.logic = f.read()
                 macro.save()
-            msg = f'Macro {item_name} added'
+            msg = f'Macro "{item_name}" added'
             callback()
 
         # structure
@@ -164,7 +164,7 @@ class Vault(nanome.PluginInstance):
             file_name = f'{name}.{extension}'
 
             VaultManager.add_file(path, file_name, f.read(), key)
-            self.send_notification(NotificationTypes.success, f'{file_name} saved')
+            self.send_notification(NotificationTypes.success, f'"{file_name}" saved')
 
         temp.close() # unsure if needed
         os.remove(temp.name)
@@ -174,7 +174,7 @@ class Vault(nanome.PluginInstance):
 
     def send_complexes(self, complexes, callback):
         self.add_to_workspace(complexes)
-        self.send_notification(NotificationTypes.success, f'{complexes[0].name} loaded')
+        self.send_notification(NotificationTypes.success, f'"{complexes[0].name}" loaded')
         callback()
 
     def display_ppt(self, file_name, callback):

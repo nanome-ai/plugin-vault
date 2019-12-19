@@ -222,6 +222,9 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 for file in files:
                     VaultManager.add_file(path, file.filename, file.file.read(), key)
 
+                self._send_json_success()
+                return
+
             elif command == 'encrypt':
                 success = VaultManager.encrypt_folder(path, form['key'].value)
                 check_error(success, "Path contains an encrypted folder", 400)

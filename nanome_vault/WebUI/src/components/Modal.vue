@@ -100,7 +100,7 @@ export default {
     showing: false,
     error: false,
     loading: false,
-    options: {},
+    options: { ...defaults },
     input1: '',
     input2: '',
     deferred: deferred()

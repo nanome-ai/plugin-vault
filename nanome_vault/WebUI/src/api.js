@@ -25,8 +25,8 @@ function sendCommand(path, command, params) {
       for (const item of value) {
         data.append(key, item)
       }
-    } else {
-      data.append(key, params[key])
+    } else if (value) {
+      data.append(key, value)
     }
   }
 
