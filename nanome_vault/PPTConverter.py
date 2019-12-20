@@ -67,10 +67,8 @@ class PPTConverter(object):
 
     def _start_conversion(self):
         Logs.debug("Starting conversion on file: " + self._base_name)
-        if platform == "linux" or platform == "linux2":
+        if platform in ["linux", "linux2", "darwin"]:
             args = ['convert', '-density', '288', self._ppt_file, self._base_name + '-pptreader-%d.jpg']
-        elif platform == "darwin":
-            Logs.error("Plugin not compatible with Mac OS yet")
         elif platform == "win32":
             if self._step == 1:
                 args = ['simpress.exe', '--headless', '--invisible', '--convert-to', 'pdf', '--outdir', self._tmp_dir.name, self._ppt_file]
