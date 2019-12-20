@@ -174,16 +174,17 @@ class Vault(nanome.PluginInstance):
 
     def get_server_url(self):
         url, port = self.custom_data
+        if url is not None:
+            return url
 
-        if url is None:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            try:
-                s.connect(('10.255.255.255', 1))
-                url = s.getsockname()[0]
-            except:
-                url = '127.0.0.1'
-            finally:
-                s.close()
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            url = s.getsockname()[0]
+        except:
+            url = '127.0.0.1'
+        finally:
+            s.close()
 
         if port != DEFAULT_SERVER_PORT:
             url += ":" + str(port)
