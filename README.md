@@ -14,7 +14,7 @@ Nanome Vault currently supports:
 ### Installation
 
 ```sh
-$ pip install nanome-vault
+$ pip3 install nanome-vault --version
 ```
 
 In order to load non-molecular files with Nanome Vault, the following applications/packages should be installed on the computer running the plugin:
@@ -50,6 +50,8 @@ On Linux, you might have to start using `sudo nanome-vault` to listen on port 80
 
   The port to use for the Web UI. Example: `-w 8080`
 
+  Some OSes prevent the default port `80` from being used without elevated permissions, so this option may be used to change to an allowed port.
+
 - `-k days`
 
   Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `-k 14`
@@ -63,6 +65,32 @@ In Nanome:
 - Activate Plugin
 - Click Run
 - Open your web browser, go to "127.0.0.1" (or your computer's IP address from another computer), and add supported files. Your files will appear in Nanome.
+
+### Development
+
+Ensure you have the latest `nanome` lib installed with:
+
+```sh
+$ pip3 install nanome --upgrade
+```
+
+Run the plugin and web server:
+
+```sh
+$ python -m nanome_vault.Vault -a <plugin_server_address> [optional args]
+```
+
+#### Web UI Development
+
+Run the Vue.js dev server in another terminal while plugin is running:
+
+```sh
+$ cd nanome_vault/WebUI
+$ yarn install
+$ yarn run serve
+```
+
+Note: this will only work if the plugin's web server is started on the default port (without using the `-w` option). To work with a non-default port, change the proxy settings in `vue.config.js`.
 
 ### License
 
