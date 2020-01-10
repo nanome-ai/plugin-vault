@@ -20,13 +20,13 @@ ENABLE_LOGS = False
 
 # Format, MIME type, Binary
 TYPES = {
-    "ico" : ("image/x-icon", True),
-    "html" : ("text/html; charset=utf-8", False),
-    "css" : ("text/css", False),
-    "js" : ("text/javascript", False),
-    "png" : ("image/png", True),
-    "jpg" : ("image/jpeg", True),
-    "" : ("text/plain", False) # Default
+    "ico": ("image/x-icon", True),
+    "html": ("text/html; charset=utf-8", False),
+    "css": ("text/css", False),
+    "js": ("text/javascript", False),
+    "png": ("image/png", True),
+    "jpg": ("image/jpeg", True),
+    "": ("application/octet-stream", True) # Default
 }
 
 # Utility to get type specs tuple
@@ -115,7 +115,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers(200, mime)
             self._write(data if is_binary else data.encode("utf-8"))
         except:
-            self._set_headers(404)
+            Logs.warning("Server error:\n", traceback.format_exc())
+            self._send_json_error(500, "Server error")
 
     # Called on GET request
     def do_GET(self):
