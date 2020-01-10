@@ -320,10 +320,11 @@ class MenuManager(object):
                 label.text_value += '/'
 
             if is_folder and name in self.locked_folders:
-                label.text_value += ' [locked]'
                 # button.icon.value.set_all(LOCK_ICON_PATH)
                 # button.icon.size = 0.5
                 # button.icon.position.x = 0.9
+                img = ln_button.find_node("ImageNode").add_new_image(LOCK_ICON_PATH)
+                img.scaling_option = img.ScalingOptions.fit
 
             def FilePressedCallback(button):
                 self.file_list.parent.enabled = False
