@@ -22,6 +22,7 @@
       v-click-out="hideContextMenu"
       @click="hideContextMenu"
       class="contextmenu"
+      ref="contextmenu"
       :style="{ top: contextmenu.top, left: contextmenu.left }"
     >
       <ul>
@@ -298,14 +299,19 @@ export default {
       this.refresh()
     },
 
-    showContextMenu({ event, path, locked, encrypted, component }) {
+    async showContextMenu({ event, path, locked, encrypted, component }) {
       this.contextmenu.show = true
       this.contextmenu.path = path
       this.contextmenu.locked = locked
       this.contextmenu.encrypted = encrypted
       this.contextmenu.component = component
-      this.contextmenu.top = event.pageY + 1 + 'px'
-      this.contextmenu.left = event.pageX + 1 + 'px'
+
+      await this.$nextTick()
+      const el = this.$refs.contextmenu
+      const top = Math.min(event.pageY + 3, innerHeight - el.clientHeight - 10)
+      const left = Math.min(event.pageX + 3, innerWidth - el.clientWidth - 10)
+      this.contextmenu.top = top + 'px'
+      this.contextmenu.left = left + 'px'
     },
 
     hideContextMenu() {

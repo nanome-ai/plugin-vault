@@ -186,6 +186,7 @@ class MenuManager(object):
             self.ln_unlock_error = self.base.find_node("UnlockError")
 
             self.inp_unlock = self.base.find_node("UnlockInput").get_content()
+            self.inp_unlock.register_submitted_callback(self.OpenLockedFolder)
             self.btn_unlock_cancel = self.base.find_node("UnlockCancel").get_content()
             self.btn_unlock_cancel.register_pressed_callback(self.CancelOpenLocked)
             self.btn_unlock_continue = self.base.find_node("UnlockContinue").get_content()
@@ -219,6 +220,7 @@ class MenuManager(object):
 
             self.ln_upload_workspace = self.base.find_node("UploadWorkspace")
             self.inp_workspace_name = self.base.find_node("UploadWorkspaceName").get_content()
+            self.inp_workspace_name.register_submitted_callback(self.UploadWorkspace)
             button_workspace_continue = self.base.find_node("UploadWorkspaceContinue").get_content()
             button_workspace_continue.register_pressed_callback(self.UploadWorkspace)
 
