@@ -6,6 +6,8 @@ Nanome Vault will start a web server. Other people can upload molecules or other
 
 Nanome Vault currently supports:
 
+- Workspaces: .nanome
+- Macros: .lua
 - Molecules: .pdb, .cif, .sdf
 - Presentations: .pptx, .ppt, .odp
 - Documents: .pdf
@@ -51,6 +53,13 @@ On Linux, you might have to start using `sudo nanome-vault` to listen on port 80
   The port to use for the Web UI. Example: `-w 8080`
 
   Some OSes prevent the default port `80` from being used without elevated permissions, so this option may be used to change to an allowed port.
+
+- `-s ssl-certificate`
+
+  SSL certificate to be used for HTTPS. If port is not set, port will default to 443. Example: `-s ./cert.pem`
+
+  To generate a self signed certificate to use for local HTTPS:\
+  `openssl req -new -x509 -keyout cert.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'`
 
 - `-k days`
 

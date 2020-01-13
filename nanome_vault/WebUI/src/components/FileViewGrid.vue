@@ -1,20 +1,42 @@
 <template>
   <div
-    class="file-view-grid-view pt-4 text-xl"
+    v-if="!loading"
+    class="file-view-grid pt-4 text-xl"
     :class="{ grid: files.length || folders.length }"
   >
-    <router-link
-      v-for="folder in folders"
-      :key="folder"
-      :title="folder"
-      :to="`${path}${folder}/`"
-      @contextmenu.native.prevent="contextmenu($event, folder + '/')"
-      event="dblclick"
-      class="cursor-default"
-    >
-      <fa-icon icon="folder" class="icon pointer-events-none" />
-      <div class="truncate">{{ folder }}</div>
-    </router-link>
+    <template v-for="folder in folders">
+      <a
+        v-if="locked.includes(folder)"
+        :key="folder"
+        :title="folder"
+        @dblclick="openLocked(folder)"
+        @contextmenu.prevent="contextmenu($event, folder + '/', true)"
+        class="cursor-default"
+      >
+        <fa-layers class="icon">
+          <fa-icon icon="folder" />
+          <fa-icon
+            :icon="isLocked(folder) ? 'lock' : 'lock-open'"
+            class="text-white"
+            transform="down-1 shrink-11"
+          />
+        </fa-layers>
+        <div class="truncate">{{ folder }}</div>
+      </a>
+
+      <router-link
+        v-else
+        :key="folder"
+        :title="folder"
+        :to="`${path}${folder}/`"
+        @contextmenu.native.prevent="contextmenu($event, folder + '/')"
+        event="dblclick"
+        class="cursor-default"
+      >
+        <fa-icon icon="folder" class="icon pointer-events-none" />
+        <div class="truncate">{{ folder }}</div>
+      </router-link>
+    </template>
 
     <template v-if="path == '/'">
       <a v-if="!$store.state.unique" @dblclick="$modal.login()">
@@ -53,13 +75,14 @@
       :key="file.full"
       :title="file.full"
       @contextmenu.prevent="contextmenu($event, file.full)"
+      @dblclick="$root.$emit('download', path + file.full)"
     >
       <fa-layers class="icon">
         <fa-icon icon="file" />
         <fa-text
           class="text-white"
           transform="down-4 shrink-12"
-          :value="file.ext"
+          :value="file.ext.substr(0, 4)"
         />
       </fa-layers>
       <div class="truncate">{{ file.name }}</div>
@@ -89,7 +112,7 @@ export default {
 </script>
 
 <style lang="scss">
-.file-view-grid-view {
+.file-view-grid {
   grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
 
   .icon {

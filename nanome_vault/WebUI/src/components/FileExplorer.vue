@@ -18,27 +18,47 @@
     </div>
 
     <div
-      v-show="contextmenu.show"
+      v-if="contextmenu.show"
       v-click-out="hideContextMenu"
+      @click="hideContextMenu"
       class="contextmenu"
+      ref="contextmenu"
       :style="{ top: contextmenu.top, left: contextmenu.left }"
     >
       <ul>
-        <li v-if="contextmenu.isFolder">
+        <li v-if="menuOptions.canCreate">
           <button class="text-gray-800" @click="newFolder(contextmenu.path)">
-            <fa-icon icon="folder-plus" />
+            <fa-icon icon="folder-plus" transform="shrink-2" class="icon" />
             new folder
           </button>
         </li>
-        <li v-else>
-          <button class="text-gray-800" @click="download(contextmenu.path)">
-            <fa-icon icon="file-download" />
+        <li v-if="!menuOptions.isFolder">
+          <button class="text-gray-800" @click="downloadItem">
+            <fa-icon icon="file-download" transform="shrink-2" class="icon" />
             download
           </button>
         </li>
-        <li v-if="contextmenu.deletable">
+        <li v-if="menuOptions.canEncrypt">
+          <button class="text-gray-800" @click="encryptFolder">
+            <fa-icon icon="lock" transform="shrink-2" class="icon" />
+            encrypt
+          </button>
+        </li>
+        <li v-else-if="contextmenu.encrypted">
+          <button class="text-gray-800" @click="decryptFolder">
+            <fa-icon icon="lock-open" transform="shrink-2" class="icon" />
+            decrypt
+          </button>
+        </li>
+        <li v-if="menuOptions.canDelete">
+          <button class="text-gray-800" @click="renameItem">
+            <fa-icon icon="pen" transform="shrink-2" class="icon" />
+            rename
+          </button>
+        </li>
+        <li v-if="menuOptions.canDelete">
           <button class="text-red-500" @click="deleteItem">
-            <fa-icon icon="trash" />
+            <fa-icon icon="trash" transform="shrink-2" class="icon" />
             delete
           </button>
         </li>
@@ -78,20 +98,42 @@ export default {
   computed: {
     path() {
       return this.$route.path
+    },
+
+    menuOptions() {
+      const { component, path, locked, encrypted } = this.contextmenu
+
+      const isFolder = path.slice(-1) === '/'
+      const canCreate = !component || (isFolder && !locked)
+      const canDelete = component && !['/shared/', '/account/'].includes(path)
+      const canEncrypt = !encrypted && isFolder && canDelete
+
+      return {
+        isFolder,
+        canCreate,
+        canDelete,
+        canEncrypt
+      }
     }
   },
 
   mounted() {
     this.$root.$on('contextmenu', this.showContextMenu)
+    this.$root.$on('download', API.download)
   },
 
   destroyed() {
     this.$root.$off('contextmenu', this.showContextMenu)
+    this.$root.$off('download', API.download)
   },
 
   methods: {
     refresh() {
-      this.$root.$emit('refresh')
+      if (this.contextmenu.component) {
+        this.contextmenu.component.refresh()
+      } else {
+        this.$root.$emit('refresh')
+      }
     },
 
     showDropzone() {
@@ -99,8 +141,6 @@ export default {
     },
 
     async newFolder(path) {
-      this.hideContextMenu()
-
       path = path || this.path
       if (path === '/') {
         path = '/shared/'
@@ -111,68 +151,175 @@ export default {
         body: `Creating folder in ${path}<br>Please provide a name:`,
         default: 'new folder'
       })
+      if (!folder) return
 
-      if (folder) {
-        const { success } = await API.create(path + folder)
-        if (!success) {
-          this.$modal.alert({
-            title: 'Name Already Exists',
-            body: 'Please select a different name'
-          })
-          return
-        }
+      const { success } = await API.create(path + folder)
+      if (!success) {
+        this.$modal.alert({
+          title: 'Name Already Exists',
+          body: 'Please select a different name'
+        })
+        return
+      }
 
-        if (path !== this.path) {
-          this.$router.push(path)
-        } else {
-          this.refresh()
-        }
+      if (path !== this.path) {
+        this.$router.push(path)
+      } else {
+        this.refresh()
       }
     },
 
-    async deleteItem() {
-      this.hideContextMenu()
+    async verifyKey(path, action) {
+      let key = API.keys.get(path)
+      if (key) return key
 
-      const path = this.contextmenu.path
+      key = await this.$modal.prompt({
+        title: `${action} Folder`,
+        body: 'Please provide the key for this folder:',
+        okTitle: 'continue',
+        password: true
+      })
+      if (!key) return
+
+      const { success } = await API.verifyKey(path, key)
+      if (!success) {
+        this.$modal.alert({
+          title: `${action} Cancelled`,
+          body: 'The provided key was incorrect'
+        })
+        return
+      }
+
+      return key
+    },
+
+    async deleteItem() {
+      const { path, encrypted } = this.contextmenu
+      const { isFolder } = this.menuOptions
+
+      let key
+      if (encrypted) {
+        key = await this.verifyKey(path, 'Delete')
+        if (!key) return
+      }
+
       const confirm = await this.$modal.confirm({
-        title: 'Delete Item',
+        title: `Delete ${isFolder ? 'Folder' : 'File'}`,
         body: `Are you sure you want to delete ${path}?`,
         okClass: 'danger',
         okTitle: 'delete',
         cancelClass: ''
       })
+      if (!confirm) return
 
-      if (confirm) {
-        await API.delete(path)
-        if (this.contextmenu.component) {
-          this.contextmenu.component.refresh()
-        } else {
-          this.refresh()
-        }
+      await API.delete(path, key)
+      this.refresh()
+    },
+
+    downloadItem() {
+      API.download(this.contextmenu.path)
+    },
+
+    async renameItem() {
+      const { path, encrypted } = this.contextmenu
+      const { isFolder } = this.menuOptions
+      const itemName = /([^/]+)\/?$/.exec(path)[1]
+
+      let key
+      if (encrypted) {
+        key = await this.verifyKey(path, 'Rename')
+        if (!key) return
       }
+
+      const name = await this.$modal.prompt({
+        title: `Rename ${isFolder ? 'Folder' : 'File'}`,
+        body: `Renaming ${path}<br>Please provide a name:`,
+        default: itemName
+      })
+      if (!name) return
+
+      await API.rename(path, key, name)
+      this.refresh()
     },
 
-    async download(path) {
-      const a = document.createElement('a')
-      a.href = '/files' + path
-      a.download = path.substring(path.lastIndexOf('/') + 1)
-      a.click()
+    async encryptFolder() {
+      const { path } = this.contextmenu
+
+      const key = await this.$modal.prompt({
+        title: 'Lock Folder',
+        body: `Encrypting ${path}<br>Please provide a key:`,
+        okTitle: 'continue',
+        password: true
+      })
+      if (!key) return
+
+      const verifyKey = await this.$modal.prompt({
+        title: 'Lock Folder',
+        body: `Encrypting ${path}<br>Please verify your key:`,
+        okTitle: 'continue',
+        password: true
+      })
+      if (!verifyKey) return
+
+      if (key !== verifyKey) {
+        this.$modal.alert({
+          title: 'Encryption Cancelled',
+          body: 'The keys you provided did not match'
+        })
+        return
+      }
+
+      const yes = await this.$modal.confirm({
+        title: 'Confirm Encryption',
+        body:
+          'Are you sure you want to continue?<br><br><b>NOTE:</b> ' +
+          'If you lose your key, you will be unable to recover the files in this folder.',
+        okTitle: 'encrypt',
+        okClass: 'danger'
+      })
+      if (!yes) return
+
+      await API.encrypt(path, key)
+      API.keys.add(path, key)
+      this.refresh()
     },
 
-    showContextMenu({ event, path, component }) {
+    async decryptFolder() {
+      const { path } = this.contextmenu
+
+      const key = await this.$modal.prompt({
+        title: 'Decrypt Folder',
+        body: `Decrypting ${path}<br>Please enter the key:`,
+        password: true
+      })
+      if (!key) return
+
+      await API.decrypt(path, key)
+      API.keys.remove(path)
+      this.refresh()
+    },
+
+    async showContextMenu({ event, path, locked, encrypted, component }) {
       this.contextmenu.show = true
       this.contextmenu.path = path
+      this.contextmenu.locked = locked
+      this.contextmenu.encrypted = encrypted
       this.contextmenu.component = component
-      this.contextmenu.top = event.pageY + 1 + 'px'
-      this.contextmenu.left = event.pageX + 1 + 'px'
 
-      const deletable = component && !['/shared/', '/account/'].includes(path)
-      this.contextmenu.deletable = deletable
-      this.contextmenu.isFolder = this.contextmenu.path.slice(-1) === '/'
+      await this.$nextTick()
+      const el = this.$refs.contextmenu
+      const top = Math.min(event.pageY + 3, innerHeight - el.clientHeight - 10)
+      const left = Math.min(event.pageX + 3, innerWidth - el.clientWidth - 10)
+      this.contextmenu.top = top + 'px'
+      this.contextmenu.left = left + 'px'
     },
 
     hideContextMenu() {
       this.contextmenu.show = false
+      this.contextmenu.path = ''
+      this.contextmenu.locked = false
+      this.contextmenu.encrypted = false
+      this.contextmenu.component = null
     }
   }
 }
@@ -181,16 +328,20 @@ export default {
 <style lang="scss">
 .file-explorer {
   .contextmenu {
-    @apply absolute bg-white text-xl w-40 rounded shadow-md overflow-hidden;
+    @apply absolute bg-white text-xl w-48 rounded shadow-md overflow-hidden;
 
     button {
-      @apply px-4 py-1 w-full text-left;
+      @apply px-2 py-1 w-full text-left;
 
       &:hover {
         @apply bg-gray-200;
       }
       &:focus {
         @apply outline-none;
+      }
+
+      .icon {
+        @apply mx-1 w-8;
       }
     }
   }

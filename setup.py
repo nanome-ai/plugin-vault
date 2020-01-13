@@ -6,7 +6,7 @@ README = (pathlib.Path(__file__).parent / "README.md").read_text()
 setup(
 	name = 'nanome-vault',
 	packages=find_packages(),
-	version = '1.0.5',
+	version = '1.1.0',
 	license='MIT',
 	description = 'A Nanome plugin that creates a web interface to upload files and make them available in Nanome',
 	long_description = README,
@@ -16,7 +16,7 @@ setup(
 	url = 'https://github.com/nanome-ai/plugin-vault',
 	platforms="any",
 	keywords = ['virtual-reality', 'chemistry', 'python', 'api', 'plugin'],
-	install_requires=['nanome'],
+	install_requires=['nanome', 'pycryptodome'],
 	entry_points={"console_scripts": ["nanome-vault = nanome_vault.Vault:main"]},
 	classifiers=[
 		'Development Status :: 3 - Alpha',
@@ -26,10 +26,9 @@ setup(
 
 		'License :: OSI Approved :: MIT License',
 
-		'Programming Language :: Python :: 2.7',
-		'Programming Language :: Python :: 3.5',
 		'Programming Language :: Python :: 3.6',
 		'Programming Language :: Python :: 3.7',
+		'Programming Language :: Python :: 3.8',
 	],
 	package_data={
         "nanome_vault": [

@@ -76,8 +76,9 @@ export default {
 
   methods: {
     onDragEnter(e) {
+      const { types } = e.dataTransfer
       this.numEvents++
-      this.numDropping = e.dataTransfer.items.length
+      this.numDropping = types.filter(t => t === 'Files').length
       this.showDropzone = true
     },
 
@@ -129,7 +130,7 @@ export default {
       if (!upload.length) {
         this.$modal.alert({
           title: 'Skipping Upload',
-          body: 'No supported files found.<br>Skipping upload.'
+          body: 'No supported files found'
         })
       } else if (skipped.length) {
         const list = skipped.map(f => f.name).join('<br>')

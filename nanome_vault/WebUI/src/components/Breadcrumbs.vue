@@ -11,7 +11,8 @@
       <fa-icon icon="arrow-up" />
     </router-link>
     <div v-for="{ name, path } of subpaths.slice(0, -1)" :key="path">
-      <router-link class="px-3" :to="path">{{ name }}</router-link>
+      <router-link v-if="path" class="px-3" :to="path">{{ name }}</router-link>
+      <span v-else class="px-3">{{ name }}</span>
       <fa-icon icon="angle-right" />
     </div>
     <div class="text-gray-600 px-3">{{ currentName }}</div>
@@ -32,10 +33,12 @@ export default {
       let path = ''
       for (let name of segments) {
         path += name + '/'
-        if (!name) {
-          name = 'files'
-        }
+        if (!name) name = 'files'
         subpaths.push({ name, path })
+      }
+
+      if (subpaths.length > 5) {
+        subpaths.splice(3, subpaths.length - 5, { name: '...' })
       }
 
       return subpaths
