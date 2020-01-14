@@ -134,6 +134,7 @@ import FileViewList from '@/components/FileViewList'
 import API from '@/api'
 
 export default {
+  name: 'file-view-list',
   extends: FileViewBase,
 
   components: {
