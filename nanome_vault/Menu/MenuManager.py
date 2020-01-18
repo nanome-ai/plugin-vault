@@ -159,6 +159,7 @@ class MenuManager(object):
             self.up_button.register_pressed_callback(go_up)
 
             self.up_button.unusable = True
+            self.up_button.icon.active = True
             self.up_button.icon.value.set_all(UP_ICON_PATH)
             self.up_button.icon.size = 0.5
             self.up_button.icon.color.unusable = nanome.util.Color.Grey()
@@ -369,6 +370,7 @@ class MenuManager(object):
                 MenuManager.RefreshMenu()
                 return
 
+            self.ln_unlock.enabled = False
             self.file_list.items.clear()
 
             self.path = os.path.normpath(os.path.join(self.path, folder))
