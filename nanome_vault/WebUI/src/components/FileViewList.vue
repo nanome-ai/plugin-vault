@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!loading" class="file-view-list text-xl">
+  <div v-if="!loading" class="file-view-list text-lg">
     <ul v-if="files.length || folders.length" class="w-full">
       <template v-for="folder in folders">
         <li :key="folder" class="p-2 flex items-center">
@@ -11,7 +11,7 @@
             :class="{ expanded: expanded[folder] }"
           />
           <a
-            v-if="locked.includes(folder)"
+            v-if="encrypted.includes(folder)"
             :title="folder"
             class="file cursor-default"
             @dblclick="openLocked(folder)"
