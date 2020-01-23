@@ -10,6 +10,7 @@ import json
 import shutil
 from datetime import datetime, timedelta
 from functools import partial
+import sys
 
 import nanome
 from nanome.util import Logs
@@ -264,6 +265,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         if ENABLE_LOGS:
             http.server.BaseHTTPRequestHandler.log_message(self, format, *args)
+            sys.stdout.flush()
 
     # Check file last accessed time and remove those older than 28 days
     def file_cleanup(self):
