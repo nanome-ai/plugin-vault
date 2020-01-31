@@ -286,6 +286,9 @@ class VaultServer():
     def start(self):
         self.__process.start()
 
+    def stop(self):
+        self.__process.kill()
+
     @classmethod
     def _start_process(cls, port, ssl_cert, keep_files_days):
         socketserver.TCPServer.allow_reuse_address = True
