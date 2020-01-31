@@ -1,17 +1,18 @@
 import os
+import sys
 from functools import partial
 
 import nanome
 
 from .. import VaultManager
 
-DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-MENU_PATH = DIR_PATH + "/Menu.json"
-PPT_TAB_PATH = DIR_PATH + "/PPTTab.json"
-IMAGE_TAB_PATH = DIR_PATH + "/ImageTab.json"
-LIST_ITEM_PATH = DIR_PATH + "/ListItem.json"
-UP_ICON_PATH = DIR_PATH + "/UpIcon.png"
-LOCK_ICON_PATH = DIR_PATH + "/LockIcon.png"
+BASE_DIR = os.path.dirname(os.path.realpath(__file__))
+MENU_PATH = os.path.join(BASE_DIR, "Menu.json")
+PPT_TAB_PATH = os.path.join(BASE_DIR, "PPTTab.json")
+IMAGE_TAB_PATH = os.path.join(BASE_DIR, "ImageTab.json")
+LIST_ITEM_PATH = os.path.join(BASE_DIR, "ListItem.json")
+UP_ICON_PATH = os.path.join(BASE_DIR, "UpIcon.png")
+LOCK_ICON_PATH = os.path.join(BASE_DIR, "LockIcon.png")
 
 class Prefabs(object):
     tab_prefab = None
@@ -374,6 +375,8 @@ class MenuManager(object):
             self.file_list.items.clear()
 
             self.path = os.path.normpath(os.path.join(self.path, folder))
+            if sys.platform.startswith('win32'):
+                self.path = self.path.replace('\\', '/')
             if not VaultManager.is_safe_path(self.path):
                 self.path = '.'
 
