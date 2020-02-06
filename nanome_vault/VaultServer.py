@@ -10,6 +10,7 @@ import json
 import shutil
 from datetime import datetime, timedelta
 from functools import partial
+import sys
 
 import nanome
 from nanome.util import Logs
@@ -55,7 +56,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             parsed_url = urllib.parse.urlparse(self.path)
             return urllib.parse.unquote(parsed_url.path)
         except:
-            pass
+            Logs.error('Error parsing path:\n', traceback.format_exc())
 
     # Utility function to set response header
     def _set_headers(self, code, type='text/html; charset=utf-8'):
@@ -121,6 +122,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     # Called on GET request
     def do_GET(self):
         path = self._parse_path()
+        if not path: return
+
         base_dir = SERVER_DIR
         is_file = re.search(r'\.[^/]+$', path) is not None
         key = None
@@ -151,15 +154,21 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     # Called on POST request
     def do_POST(self):
         path = self._parse_path()
+        if not path: return
+
         if not path.startswith('/files'):
             self._send_json_error(403, "Forbidden")
             return
         path = path[7:]
 
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={'REQUEST_METHOD': 'POST'})
+        try:
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={'REQUEST_METHOD': 'POST'})
+        except:
+            Logs.error('Error parsing form data:\n', traceback.format_exc())
+            return
 
         if 'command' not in form:
             self._send_json_error(400, "Invalid command")
@@ -256,6 +265,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         if ENABLE_LOGS:
             http.server.BaseHTTPRequestHandler.log_message(self, format, *args)
+            sys.stdout.flush()
 
     # Check file last accessed time and remove those older than 28 days
     def file_cleanup(self):
@@ -304,3 +314,5 @@ class VaultServer():
             server.serve_forever()
         except KeyboardInterrupt:
             pass
+        except:
+            Logs.error('Error in serve_forever', traceback.format_exc())
