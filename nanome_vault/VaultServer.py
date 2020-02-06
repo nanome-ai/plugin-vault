@@ -312,4 +312,4 @@ class VaultServer():
         except KeyboardInterrupt:
             pass
         except:
-            Logs.error('Error with', traceback.format_exc())
+            Logs.error('Error in serve_forever', traceback.format_exc())
