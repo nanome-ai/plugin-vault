@@ -1,12 +1,12 @@
 <template>
   <div
     v-if="!loading"
-    class="file-view-grid pt-4 text-xl"
+    class="file-view-grid pt-4 text-lg"
     :class="{ grid: files.length || folders.length }"
   >
     <template v-for="folder in folders">
       <a
-        v-if="locked.includes(folder)"
+        v-if="encrypted.includes(folder)"
         :key="folder"
         :title="folder"
         @dblclick="openLocked(folder)"

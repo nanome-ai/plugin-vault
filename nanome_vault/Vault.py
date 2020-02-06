@@ -242,13 +242,20 @@ def main():
     if ssl_cert is not None and port == DEFAULT_SERVER_PORT:
         port = 443
 
-    server = VaultServer(port, ssl_cert, keep_files_days)
-    server.start()
+    server = None
+    def pre_run():
+        nonlocal server
+        server = VaultServer(port, ssl_cert, keep_files_days)
+        server.start()
+    def post_run():
+        server.stop()
 
     # Plugin
     plugin = nanome.Plugin("Nanome Vault", "Use your browser to upload files and folders to make them available in Nanome.", "Loading", False)
     plugin.set_plugin_class(Vault)
     plugin.set_custom_data(url, port)
+    plugin.pre_run = pre_run
+    plugin.post_run = post_run
     plugin.run('127.0.0.1', 8888)
 
 if __name__ == "__main__":

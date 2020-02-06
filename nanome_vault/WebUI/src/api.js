@@ -5,15 +5,21 @@ function replaceAccount(path) {
   return path.replace(/^\/account/, '/' + store.state.unique)
 }
 
-function request(url, options) {
-  return fetch(url, options).then(async res => {
-    const json = await res.json()
-    json.code = res.status
-    return json
-  })
+function addSlash(path) {
+  return path.replace(/\b$/, '/')
 }
 
-function sendCommand(path, command, params) {
+async function request(url, options) {
+  const res = await fetch(url, options)
+  const json = await res.json()
+  json.code = res.status
+  return json
+}
+
+function sendCommand(path, command, params = {}) {
+  if (!params.key) {
+    params.key = API.keys.get(path)
+  }
   path = replaceAccount(path)
 
   const data = new FormData()
@@ -41,15 +47,17 @@ const keys = {}
 const API = {
   keys: {
     add(path, key) {
-      path = path.replace(/\/$/, '')
+      path = addSlash(path)
       keys[path] = key
     },
     get(path) {
+      path = addSlash(path)
       const paths = Object.keys(keys)
       const locked = paths.find(p => path.indexOf(p) == 0)
       return keys[locked]
     },
     remove(path) {
+      path = addSlash(path)
       delete keys[path]
     }
   },
@@ -133,10 +141,11 @@ const API = {
     }
 
     folder.path = path
+    folder.locked_path = data.locked_path
     folder.locked = data.locked
     folder.folders = data.folders
     folder.files = data.files.map(f => {
-      const [full, name, ext] = /^(.+?)(?:\.(\w+))?$/.exec(f)
+      const [full, name, ext = ''] = /^(.+?)(?:\.(\w+))?$/.exec(f)
       return { full, name, ext }
     })
 
@@ -145,19 +154,19 @@ const API = {
 
   upload(path, files) {
     if (!files || !files.length) return
-    return sendCommand(path, 'upload', { files, key: API.keys.get(path) })
+    return sendCommand(path, 'upload', { files })
   },
 
-  delete(path, key) {
-    return sendCommand(path, 'delete', { key })
+  delete(path) {
+    return sendCommand(path, 'delete')
   },
 
-  create(path, key) {
-    return sendCommand(path, 'create', { key })
+  create(path) {
+    return sendCommand(path, 'create')
   },
 
-  rename(path, key, name) {
-    return sendCommand(path, 'rename', { key, name })
+  rename(path, name) {
+    return sendCommand(path, 'rename', { name })
   },
 
   encrypt(path, key) {

@@ -50,13 +50,13 @@
             decrypt
           </button>
         </li>
-        <li v-if="menuOptions.canDelete">
+        <li v-if="menuOptions.canModify">
           <button class="text-gray-800" @click="renameItem">
             <fa-icon icon="pen" transform="shrink-2" class="icon" />
             rename
           </button>
         </li>
-        <li v-if="menuOptions.canDelete">
+        <li v-if="menuOptions.canModify">
           <button class="text-red-500" @click="deleteItem">
             <fa-icon icon="trash" transform="shrink-2" class="icon" />
             delete
@@ -89,6 +89,9 @@ export default {
       show: false,
       component: null,
       path: '',
+      locked: false,
+      encrypted: false,
+      key_path: null,
       top: 0,
       left: 0
     },
@@ -101,17 +104,17 @@ export default {
     },
 
     menuOptions() {
-      const { component, path, locked, encrypted } = this.contextmenu
+      const { component, path, locked, encrypted, key_path } = this.contextmenu
 
       const isFolder = path.slice(-1) === '/'
       const canCreate = !component || (isFolder && !locked)
-      const canDelete = component && !['/shared/', '/account/'].includes(path)
-      const canEncrypt = !encrypted && isFolder && canDelete
+      const canModify = component && !['/shared/', '/account/'].includes(path)
+      const canEncrypt = !encrypted && !key_path && isFolder && canModify
 
       return {
         isFolder,
         canCreate,
-        canDelete,
+        canModify,
         canEncrypt
       }
     }
@@ -140,10 +143,40 @@ export default {
       this.$refs.dropzone.show()
     },
 
+    async verifyKey(path, action) {
+      let key = API.keys.get(path)
+      if (key) return key
+
+      key = await this.$modal.prompt({
+        title: `${action} Folder`,
+        body: 'Please provide the key for this folder:',
+        okTitle: 'continue',
+        password: true
+      })
+      if (!key) return
+
+      const { success } = await API.verifyKey(path, key)
+      if (!success) {
+        this.$modal.alert({
+          title: `${action} Cancelled`,
+          body: 'The provided key was incorrect'
+        })
+        return
+      }
+
+      API.keys.add(path, key)
+      return key
+    },
+
     async newFolder(path) {
       path = path || this.path
       if (path === '/') {
         path = '/shared/'
+      }
+
+      if (this.contextmenu.key_path) {
+        const key = await this.verifyKey(path, 'Create')
+        if (!key) return
       }
 
       const folder = await this.$modal.prompt({
@@ -169,37 +202,12 @@ export default {
       }
     },
 
-    async verifyKey(path, action) {
-      let key = API.keys.get(path)
-      if (key) return key
-
-      key = await this.$modal.prompt({
-        title: `${action} Folder`,
-        body: 'Please provide the key for this folder:',
-        okTitle: 'continue',
-        password: true
-      })
-      if (!key) return
-
-      const { success } = await API.verifyKey(path, key)
-      if (!success) {
-        this.$modal.alert({
-          title: `${action} Cancelled`,
-          body: 'The provided key was incorrect'
-        })
-        return
-      }
-
-      return key
-    },
-
     async deleteItem() {
-      const { path, encrypted } = this.contextmenu
+      const { path, key_path } = this.contextmenu
       const { isFolder } = this.menuOptions
 
-      let key
-      if (encrypted) {
-        key = await this.verifyKey(path, 'Delete')
+      if (key_path) {
+        const key = await this.verifyKey(path, 'Delete')
         if (!key) return
       }
 
@@ -212,7 +220,7 @@ export default {
       })
       if (!confirm) return
 
-      await API.delete(path, key)
+      await API.delete(path)
       this.refresh()
     },
 
@@ -221,13 +229,12 @@ export default {
     },
 
     async renameItem() {
-      const { path, encrypted } = this.contextmenu
+      const { path, key_path } = this.contextmenu
       const { isFolder } = this.menuOptions
       const itemName = /([^/]+)\/?$/.exec(path)[1]
 
-      let key
-      if (encrypted) {
-        key = await this.verifyKey(path, 'Rename')
+      if (key_path) {
+        const key = await this.verifyKey(path, 'Rename')
         if (!key) return
       }
 
@@ -238,7 +245,7 @@ export default {
       })
       if (!name) return
 
-      await API.rename(path, key, name)
+      await API.rename(path, name)
       this.refresh()
     },
 
@@ -299,17 +306,19 @@ export default {
       this.refresh()
     },
 
-    async showContextMenu({ event, path, locked, encrypted, component }) {
+    async showContextMenu(e) {
       this.contextmenu.show = true
-      this.contextmenu.path = path
-      this.contextmenu.locked = locked
-      this.contextmenu.encrypted = encrypted
-      this.contextmenu.component = component
+      this.contextmenu.path = e.path
+      this.contextmenu.locked = e.locked
+      this.contextmenu.encrypted = e.encrypted
+      this.contextmenu.key_path = e.key_path
+      this.contextmenu.component = e.component
 
       await this.$nextTick()
       const el = this.$refs.contextmenu
-      const top = Math.min(event.pageY + 3, innerHeight - el.clientHeight - 10)
-      const left = Math.min(event.pageX + 3, innerWidth - el.clientWidth - 10)
+      const { pageX, pageY } = e.event
+      const top = Math.min(pageY + 3, innerHeight - el.clientHeight - 10)
+      const left = Math.min(pageX + 3, innerWidth - el.clientWidth - 10)
       this.contextmenu.top = top + 'px'
       this.contextmenu.left = left + 'px'
     },
@@ -319,6 +328,7 @@ export default {
       this.contextmenu.path = ''
       this.contextmenu.locked = false
       this.contextmenu.encrypted = false
+      this.contextmenu.key_path = null
       this.contextmenu.component = null
     }
   }

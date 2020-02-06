@@ -8,7 +8,8 @@ export default {
 
   data: () => ({
     loading: true,
-    locked: [],
+    key_path: null,
+    encrypted: [],
     folders: [],
     files: []
   }),
@@ -35,7 +36,8 @@ export default {
 
       try {
         const data = await API.getFolder(this.path)
-        this.locked = data.locked
+        this.key_path = data.locked_path
+        this.encrypted = data.locked
         this.folders = data.folders
         this.files = data.files
         this.loading = false
@@ -59,16 +61,16 @@ export default {
         path: this.path + item,
         locked: this.isLocked(item),
         encrypted,
+        key_path: this.key_path,
         component: this
       })
     },
 
     isLocked(folder) {
       folder = folder.replace(/\/$/, '')
-      const path = this.path + folder
-      const noKey = !API.keys.get(path)
-      const isLocked = this.loading || this.locked.includes(folder)
-      return noKey && isLocked
+      const isEncrypted = this.loading || this.encrypted.includes(folder)
+      const noKey = !API.keys.get(this.path + folder)
+      return isEncrypted && noKey
     },
 
     async unlockFolder(folder = '') {

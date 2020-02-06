@@ -5,7 +5,7 @@ from . import AESCipher
 
 LOCK_TEXT = 'nanome-vault-lock'
 
-FILES_DIR = os.path.expanduser('~/Documents/nanome-vault')
+FILES_DIR = os.path.normpath(os.path.expanduser('~/Documents/nanome-vault'))
 if not os.path.exists(os.path.join(FILES_DIR, 'shared')):
     os.makedirs(os.path.join(FILES_DIR, 'shared'))
 
@@ -133,7 +133,7 @@ def add_file(path, filename, data, key=None):
     filepath = os.path.join(path, filename)
 
     # rename on duplicates: file.txt -> file (n).txt
-    reg = r'(.+/)([^/]+?)(?: \((\d+)\))?(\.\w+)'
+    reg = r'(.+[/\\])([^/\\]+?)(?: \((\d+)\))?(\.\w+)'
     (path, name, copy, ext) = re.search(reg, filepath).groups()
     copy = 1 if copy is None else int(copy)
 

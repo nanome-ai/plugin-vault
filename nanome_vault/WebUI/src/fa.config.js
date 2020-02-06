@@ -26,6 +26,7 @@ import {
   faPlus,
   faSadTear,
   faSearch,
+  faSyncAlt,
   faTh,
   faTrash
 } from '@fortawesome/free-solid-svg-icons'
@@ -45,6 +46,7 @@ library.add({
   faPlus,
   faSadTear,
   faSearch,
+  faSyncAlt,
   faTh,
   faTrash
 })

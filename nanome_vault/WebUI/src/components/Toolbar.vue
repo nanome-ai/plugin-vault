@@ -9,7 +9,7 @@
         name="display-mode"
         id="display-mode-grid"
       />
-      <label for="display-mode-grid" class="btn rounded-l">
+      <label for="display-mode-grid" class="btn rounded-l" title="grid view">
         <fa-icon icon="th" />
       </label>
       <input
@@ -19,20 +19,32 @@
         name="display-mode"
         id="display-mode-list"
       />
-      <label for="display-mode-list" class="btn rounded-r">
+      <label for="display-mode-list" class="btn rounded-r" title="list view">
         <fa-icon icon="bars" />
       </label>
     </div>
-    <button class="btn rounded mr-2" @click="$emit('new-folder')">
+    <button
+      @click="$root.$emit('refresh')"
+      class="btn rounded mr-2"
+      title="refresh"
+    >
+      <fa-icon icon="sync-alt" />
+      <span class="hidden ml-1 lg:inline"> refresh</span>
+    </button>
+    <button
+      @click="$emit('new-folder')"
+      class="btn rounded mr-2"
+      title="new folder"
+    >
       <fa-layers>
         <fa-icon icon="folder" />
         <fa-icon icon="plus" transform="down-1 shrink-10" class="text-white" />
       </fa-layers>
-      <span class="hidden lg:inline"> new folder</span>
+      <span class="hidden ml-1 lg:inline"> new folder</span>
     </button>
-    <button class="btn rounded" @click="$emit('show-upload')">
+    <button @click="$emit('show-upload')" class="btn rounded" title="upload">
       <fa-icon icon="cloud-upload-alt" />
-      <span class="hidden lg:inline"> upload</span>
+      <span class="hidden ml-1 lg:inline"> upload</span>
     </button>
     <!-- <div class="flex-grow"></div>
     <div class="search relative">
