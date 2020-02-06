@@ -17,7 +17,7 @@ from nanome.util import Logs
 
 from . import AESCipher, VaultManager
 
-ENABLE_LOGS = True
+ENABLE_LOGS = False
 
 # Format, MIME type, Binary
 TYPES = {
