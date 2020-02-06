@@ -284,6 +284,9 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 if last_accessed < expiry_date:
                     os.remove(file_path)
 
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
+
 class VaultServer():
     def __init__(self, port, ssl_cert, keep_files_days):
         self.__process = Process(target=VaultServer._start_process, args=(port, ssl_cert, keep_files_days))
@@ -301,10 +304,10 @@ class VaultServer():
 
     @classmethod
     def _start_process(cls, port, ssl_cert, keep_files_days):
-        socketserver.TCPServer.allow_reuse_address = True
+        ThreadedTCPServer.allow_reuse_address = True
 
         handler = partial(RequestHandler, keep_files_days)
-        server = socketserver.TCPServer(("", port), handler)
+        server = ThreadedTCPServer(("", port), handler)
 
         if ssl_cert is not None:
             import ssl
