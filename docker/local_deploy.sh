@@ -19,7 +19,6 @@ done
 
 docker run -d \
 --restart always \
--p 8888:8888 \
 -p $PORT:$PORT \
 -e ARGS="$ARGS" \
 -v vault-volume:/root \
