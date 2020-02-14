@@ -1,11 +1,12 @@
-FROM python:3.7
+FROM continuumio/miniconda3
 
-ENV PLUGIN_SERVER=plugins.nanome.ai
+ENV ARGS=''
 
 COPY . /app
 WORKDIR /app
 
 RUN pip install pycryptodome
 RUN pip install nanome
+RUN conda install -c openbabel openbabel
 
-CMD python -m nanome_vault.Vault -a ${PLUGIN_SERVER}
+CMD python run.py ${ARGS}

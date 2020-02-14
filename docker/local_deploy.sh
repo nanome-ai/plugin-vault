@@ -1,20 +1,26 @@
 if [ "$(docker ps -aq -f name=vault)" != "" ]; then
-        # cleanup
-        echo "removing exited container"
-        docker rm -f vault
+    # cleanup
+    echo "removing exited container"
+    docker rm -f vault
 fi
 
-if [ "$1" != "" ]; then
-    echo "Using specified plugin server: $1"
-    docker run -d \
-    -p 8888:8888 \
-    -e PLUGIN_SERVER=$1 \
-    --mount source=vault-volume,destination=/app \
-    --name vault vault
-else
-    echo "Using default plugin server: plugins.nanome.ai"
-    docker run -d \
-    -p 8888:8888 \
-    --mount source=vault-volume,destination=/app \
-    --name vault vault
-fi
+PORT=80
+ARGS=$*
+
+while [ "$1" != "" ]; do
+    case $1 in
+        -w)
+            shift
+            PORT=$1
+            ;;
+    esac
+    shift
+done
+
+docker run -d \
+--restart always \
+-p 8888:8888 \
+-p $PORT:$PORT \
+-e ARGS="$ARGS" \
+-v vault-volume:/root \
+--name vault vault
