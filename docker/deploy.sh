@@ -1,23 +1,26 @@
-#!/bin/bash
+if [ "$(docker ps -aq -f name=vault)" != "" ]; then
+    # cleanup
+    echo "removing exited container"
+    docker rm -f vault
+fi
 
-USER=user
-SERVER=localhost
-SSH=$USER@$SERVER
-TAG=latest
+PORT=80
+ARGS=$*
 
-IMAGE=vault
-REPO=441665557124.dkr.ecr.us-west-1.amazonaws.com
+while [ "$1" != "" ]; do
+    case $1 in
+        -w)
+            shift
+            PORT=$1
+            ;;
+    esac
+    shift
+done
 
-echo "" > remote-actions.txt
-
-echo "sudo docker pull $REPO/$IMAGE:$TAG" >> remote-actions.txt
-echo "sudo docker stop $IMAGE" >> remote-actions.txt
-echo "sudo docker rm -f $IMAGE" >> remote-actions.txt
-echo "sudo docker run \
-    -d --restart unless-stopped \
-    --name=$IMAGE  \
-    -p 8888:8888 \
-    $REPO/$IMAGE:$TAG" >> remote-actions.txt
-
-ssh $SSH 'bash -s' < remote-actions.txt
-rm remote-actions.txt
+docker run -d \
+--name vault \
+--restart unless-stopped \
+-p $PORT:$PORT \
+-e ARGS="$ARGS" \
+-v vault-volume:/root \
+vault

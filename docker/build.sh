@@ -1,17 +1,8 @@
-#!/bin/bash
+if [[ $(docker volume ls -f name=vault-volume -q) ]]; then
+    echo "Skipping volume creation"
+else
+    echo "Creating new docker volume"
+    docker volume create vault-volume
+fi
 
-ENV=production
-IMAGE=vault
-REPO=441665557124.dkr.ecr.us-west-1.amazonaws.com
-
-# Sign in to AWS
-aws ecr get-login --no-include-email --region us-west-1 | sh
-
-# Build docker
-docker build -f $IMAGE.Dockerfile -t $IMAGE:$ENV .
-
-# Tag docker
-docker tag $IMAGE:$ENV $REPO/$IMAGE:$ENV
-
-# Upload docker to secured repo
-docker push $REPO/$IMAGE:$ENV
+docker build -f Dockerfile -t vault:latest ..
