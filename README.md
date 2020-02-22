@@ -41,7 +41,7 @@ See this answer on AskUbuntu for more information: https://askubuntu.com/a/10819
 To start the plugin:
 
 ```sh
-$ nanome-vault -a <plugin_server_address>
+$ nanome-vault -a <plugin_server_address> [optional args]
 ```
 
 On Linux, you might have to start using `sudo nanome-vault` to listen on port 80.
@@ -75,6 +75,16 @@ In Nanome:
 - Click Run
 - Open your web browser, go to "127.0.0.1" (or your computer's IP address from another computer), and add supported files. Your files will appear in Nanome.
 
+### Docker Usage
+
+To run in a Docker container:
+
+```sh
+$ cd docker
+$ ./build.sh
+$ ./deploy.sh -a <plugin_server_address> [optional args]
+```
+
 ### Development
 
 Ensure you have the latest `nanome` lib installed with:
@@ -86,7 +96,7 @@ $ pip3 install nanome --upgrade
 Run the plugin and web server:
 
 ```sh
-$ python -m nanome_vault.Vault -a <plugin_server_address> [optional args]
+$ python run.py -a <plugin_server_address> [optional args]
 ```
 
 #### Web UI Development
