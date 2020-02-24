@@ -1,16 +1,16 @@
-import urllib
-import http.server
-import socketserver
-from multiprocessing import Process
 import cgi
-import os
-import traceback
-import re
 import json
-import shutil
-from datetime import datetime, timedelta
-from functools import partial
+import os
+import re
 import sys
+import traceback
+import urllib
+from datetime import datetime, timedelta
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from multiprocessing import Process
+from socketserver import ThreadingMixIn
+from threading import Thread
+from time import sleep
 
 import nanome
 from nanome.util import Logs
@@ -45,12 +45,7 @@ POST_REQS = {
 SERVER_DIR = os.path.join(os.path.dirname(__file__), 'WebUI/dist')
 
 # Class handling HTTP requests
-class RequestHandler(http.server.BaseHTTPRequestHandler):
-    def __init__(self, keep_files_days, *args, **kwargs):
-        self.last_cleanup = datetime.fromtimestamp(0)
-        self.keep_files_days = keep_files_days
-        super().__init__(*args, **kwargs)
-
+class RequestHandler(BaseHTTPRequestHandler):
     def _parse_path(self):
         try:
             parsed_url = urllib.parse.urlparse(self.path)
@@ -85,9 +80,6 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
 
     # Special GET case: get file list
     def _send_list(self, path=None):
-        if self.keep_files_days > 0:
-            self.file_cleanup()
-
         try:
             response = VaultManager.list_path(path)
             response['success'] = True
@@ -264,37 +256,22 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     # Override to prevent HTTP server from logging every request if ENABLE_LOGS is False
     def log_message(self, format, *args):
         if ENABLE_LOGS:
-            http.server.BaseHTTPRequestHandler.log_message(self, format, *args)
+            BaseHTTPRequestHandler.log_message(self, format, *args)
             sys.stdout.flush()
 
-    # Check file last accessed time and remove those older than 28 days
-    def file_cleanup(self):
-        # don't execute more than once every 5 min
-        if datetime.today() - self.last_cleanup < timedelta(minutes=5):
-            return
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    allow_reuse_address = True
 
-        self.last_cleanup = datetime.today()
-        expiry_date = datetime.today() - timedelta(days=self.keep_files_days)
-
-        for (dirpath, _, filenames) in os.walk(VaultManager.FILES_DIR):
-            for filename in filenames:
-                file_path = os.path.join(dirpath, filename)
-                last_accessed = datetime.fromtimestamp(os.path.getatime(file_path))
-
-                if last_accessed < expiry_date:
-                    os.remove(file_path)
-
-class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    pass
+    def finish_request(self, request, client_address):
+        request.settimeout(30)
+        HTTPServer.finish_request(self, request, client_address)
 
 class VaultServer():
-    def __init__(self, port, ssl_cert, keep_files_days):
-        self.__process = Process(target=VaultServer._start_process, args=(port, ssl_cert, keep_files_days))
+    is_running = False
+    keep_files_days = 0
 
-    @staticmethod
-    def file_filter(name):
-        valid_ext = (".nanome", ".lua", ".pdb", ".sdf", ".cif", ".ppt", ".pptx", ".odp", ".pdf", ".png", ".jpg")
-        return name.endswith(valid_ext)
+    def __init__(self, port, ssl_cert, keep_files_days):
+        self.__process = Process(target=VaultServer.start_process, args=(port, ssl_cert, keep_files_days))
 
     def start(self):
         self.__process.start()
@@ -302,20 +279,52 @@ class VaultServer():
     def stop(self):
         self.__process.kill()
 
-    @classmethod
-    def _start_process(cls, port, ssl_cert, keep_files_days):
-        ThreadedTCPServer.allow_reuse_address = True
+    @staticmethod
+    def file_filter(name):
+        valid_ext = (".nanome", ".lua", ".pdb", ".sdf", ".cif", ".ppt", ".pptx", ".odp", ".pdf", ".png", ".jpg")
+        return name.endswith(valid_ext)
 
-        handler = partial(RequestHandler, keep_files_days)
-        server = ThreadedTCPServer(("", port), handler)
+    @classmethod
+    def start_process(cls, port, ssl_cert, keep_files_days):
+        VaultServer.is_running = True
+        VaultServer.keep_files_days = keep_files_days
+
+        server = ThreadedHTTPServer(("", port), RequestHandler)
 
         if ssl_cert is not None:
             import ssl
             server.socket = ssl.wrap_socket(server.socket, certfile=ssl_cert, server_side=True)
 
+        cleanup_thread = None
+        if VaultServer.keep_files_days:
+            cleanup_thread = Thread(target=VaultServer.file_cleanup)
+            cleanup_thread.start()
+
         try:
             server.serve_forever()
         except KeyboardInterrupt:
-            pass
+            server.socket.close()
         except:
             Logs.error('Error in serve_forever', traceback.format_exc())
+
+        VaultServer.is_running = False
+
+        if cleanup_thread:
+            cleanup_thread.join()
+
+    @staticmethod
+    def file_cleanup():
+        while VaultServer.is_running:
+            expiry_date = datetime.today() - timedelta(days=VaultServer.keep_files_days)
+
+            # check file last accessed time and remove those older than keep_files_days
+            for root, _, files in os.walk(VaultManager.FILES_DIR):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    last_accessed = datetime.fromtimestamp(os.path.getatime(file_path))
+
+                    if last_accessed < expiry_date:
+                        os.remove(file_path)
+
+            # wait 5 minutes
+            sleep(300)
