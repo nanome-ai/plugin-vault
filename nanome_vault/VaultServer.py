@@ -1,14 +1,14 @@
 import cgi
-import http.server
 import json
 import os
 import re
-import socketserver
 import sys
 import traceback
 import urllib
 from datetime import datetime, timedelta
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from multiprocessing import Process
+from socketserver import ThreadingMixIn
 from threading import Thread
 from time import sleep
 
@@ -45,7 +45,7 @@ POST_REQS = {
 SERVER_DIR = os.path.join(os.path.dirname(__file__), 'WebUI/dist')
 
 # Class handling HTTP requests
-class RequestHandler(http.server.BaseHTTPRequestHandler):
+class RequestHandler(BaseHTTPRequestHandler):
     def _parse_path(self):
         try:
             parsed_url = urllib.parse.urlparse(self.path)
@@ -256,15 +256,15 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     # Override to prevent HTTP server from logging every request if ENABLE_LOGS is False
     def log_message(self, format, *args):
         if ENABLE_LOGS:
-            http.server.BaseHTTPRequestHandler.log_message(self, format, *args)
+            BaseHTTPRequestHandler.log_message(self, format, *args)
             sys.stdout.flush()
 
-class ThreadedTCPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
 
     def finish_request(self, request, client_address):
         request.settimeout(30)
-        http.server.HTTPServer.finish_request(self, request, client_address)
+        HTTPServer.finish_request(self, request, client_address)
 
 class VaultServer():
     is_running = False
@@ -289,7 +289,7 @@ class VaultServer():
         VaultServer.is_running = True
         VaultServer.keep_files_days = keep_files_days
 
-        server = ThreadedTCPServer(("", port), RequestHandler)
+        server = ThreadedHTTPServer(("", port), RequestHandler)
 
         if ssl_cert is not None:
             import ssl
