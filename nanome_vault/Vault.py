@@ -21,8 +21,13 @@ DEFAULT_KEEP_FILES_DAYS = 0
 # Plugin instance (for Nanome)
 class Vault(nanome.PluginInstance):
     def start(self):
+        self.set_plugin_list_button(self.PluginListButtonType.run, 'Open')
+
         # set to empty string to read/write macros in Macros folder
         nanome.api.macro.Macro.set_plugin_identifier('')
+
+        # "hack" to check if Nanome supports send_files_to_load
+        self.can_send_files = self._network._ProcessNetwork__version_table.get('LoadFile') != None
 
         self.running = False
         self.ppt_readers = {}
@@ -71,8 +76,7 @@ class Vault(nanome.PluginInstance):
         self.menu_manager.home_page.Update()
 
     def load_file(self, name, callback):
-        item_name = '.'.join(name.split(".")[:-1])
-        extension = name.split(".")[-1]
+        item_name, extension = name.rsplit(".", 1)
 
         path = self.menu_manager.home_page.path
         file_path = VaultManager.get_vault_path(os.path.join(path, name))
@@ -80,9 +84,10 @@ class Vault(nanome.PluginInstance):
         temp = None
         if self.menu_manager.home_page.locked_path:
             key = self.menu_manager.home_page.folder_key
-            temp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
-            VaultManager.decrypt_file(file_path, key, temp.name)
-            file_path = temp.name
+            temp = tempfile.TemporaryDirectory()
+            temp_path = os.path.join(temp.name, name)
+            VaultManager.decrypt_file(file_path, key, temp_path)
+            file_path = temp_path
 
         msg = None
 
@@ -103,6 +108,9 @@ class Vault(nanome.PluginInstance):
                 macro.save()
             msg = f'Macro "{item_name}" added'
             callback()
+
+        elif self.can_send_files and extension not in ['ppt', 'pptx', 'odp']:
+            self.send_files_to_load(file_path, lambda _: callback())
 
         # structure
         elif extension == 'pdb':
@@ -134,8 +142,7 @@ class Vault(nanome.PluginInstance):
             self.send_notification(NotificationTypes.success, msg)
 
         if temp:
-            temp.close()
-            os.remove(temp.name)
+            temp.cleanup()
 
     def save_file(self, item, name, extension):
         temp = tempfile.NamedTemporaryFile(delete=False, suffix=extension)
