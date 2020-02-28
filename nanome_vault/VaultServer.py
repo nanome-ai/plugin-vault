@@ -21,13 +21,13 @@ ENABLE_LOGS = False
 
 # Format, MIME type, Binary
 TYPES = {
-    "ico": ("image/x-icon", True),
-    "html": ("text/html; charset=utf-8", False),
-    "css": ("text/css", False),
-    "js": ("text/javascript", False),
-    "png": ("image/png", True),
-    "jpg": ("image/jpeg", True),
-    "": ("application/octet-stream", True) # Default
+    'ico': ('image/x-icon', True),
+    'html': ('text/html; charset=utf-8', False),
+    'css': ('text/css', False),
+    'js': ('text/javascript', False),
+    'png': ('image/png', True),
+    'jpg': ('image/jpeg', True),
+    '': ('application/octet-stream', True) # Default
 }
 
 # Utility to get type specs tuple
@@ -63,20 +63,20 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             self.wfile.write(message)
         except:
-            Logs.warning("Connection reset while responding", self.client_address)
+            Logs.warning('Connection reset while responding', self.client_address)
 
     def _send_json_success(self, code=200):
         self._set_headers(code, 'application/json')
         response = dict()
         response['success'] = True
-        self._write(json.dumps(response).encode("utf-8"))
+        self._write(json.dumps(response).encode('utf-8'))
 
     def _send_json_error(self, code, message):
         response = dict()
         response['success'] = False
         response['error'] = message
         self._set_headers(code, 'application/json')
-        self._write(json.dumps(response).encode("utf-8"))
+        self._write(json.dumps(response).encode('utf-8'))
 
     # Special GET case: get file list
     def _send_list(self, path=None):
@@ -84,7 +84,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             response = VaultManager.list_path(path)
             response['success'] = True
             self._set_headers(200, 'application/json')
-            self._write(json.dumps(response).encode("utf-8"))
+            self._write(json.dumps(response).encode('utf-8'))
         except VaultManager.InvalidPathError:
             self._send_json_error(404, 'Not found')
 
@@ -96,7 +96,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            ext = path.split(".")[-1]
+            ext = path.split('.')[-1]
             (mime, is_binary) = get_type(ext)
 
             with open(path, 'rb' if is_binary else 'r') as f:
@@ -106,10 +106,10 @@ class RequestHandler(BaseHTTPRequestHandler):
                 data = AESCipher.decrypt(data, key)
 
             self._set_headers(200, mime)
-            self._write(data if is_binary else data.encode("utf-8"))
+            self._write(data if is_binary else data.encode('utf-8'))
         except:
-            Logs.warning("Server error:\n", traceback.format_exc())
-            self._send_json_error(500, "Server error")
+            Logs.warning('Server error:\n', traceback.format_exc())
+            self._send_json_error(500, 'Server error')
 
     # Called on GET request
     def do_GET(self):
@@ -149,7 +149,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not path: return
 
         if not path.startswith('/files'):
-            self._send_json_error(403, "Forbidden")
+            self._send_json_error(403, 'Forbidden')
             return
         path = path[7:]
 
@@ -163,7 +163,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         if 'command' not in form:
-            self._send_json_error(400, "Invalid command")
+            self._send_json_error(400, 'Invalid command')
             return
 
         # commands: create, delete, upload, encrypt, decrypt
@@ -172,13 +172,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         # check if missing any required form data
         missing = [req for req in POST_REQS.get(command, []) if req not in form]
         if missing:
-            self._send_json_error(400, f"Missing required values: {', '.join(missing)}")
+            self._send_json_error(400, f'Missing required values: {", ".join(missing)}')
             return
 
         def check_auth(path, form):
             if VaultManager.is_path_locked(path):
                 if 'key' not in form or not VaultManager.is_key_valid(path, form['key'].value):
-                    self._send_json_error(403, "Forbidden")
+                    self._send_json_error(403, 'Forbidden')
                     return False
             return True
 
@@ -192,21 +192,21 @@ class RequestHandler(BaseHTTPRequestHandler):
             if command == 'create':
                 if not check_auth(path, form): return
                 success = VaultManager.create_path(path)
-                check_error(success, "Path already exists", 400)
+                check_error(success, 'Path already exists', 400)
 
             elif command == 'delete':
                 if not path or path == 'shared':
-                    self._send_json_error(403, "Forbidden")
+                    self._send_json_error(403, 'Forbidden')
                     return
 
                 if not check_auth(path, form): return
                 success = VaultManager.delete_path(path)
-                check_error(success, f"Error deleting {path}")
+                check_error(success, f'Error deleting {path}')
 
             elif command == 'rename':
                 if not check_auth(path, form): return
                 success = VaultManager.rename_path(path, form['name'].value)
-                check_error(success, f"Error renaming {path}")
+                check_error(success, f'Error renaming {path}')
 
             elif command == 'upload':
                 if not check_auth(path, form): return
@@ -218,7 +218,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
                 unsupported = [file.filename for file in files if not VaultServer.file_filter(file.filename)]
                 if unsupported:
-                    self._send_json_error(400, f"Format not supported: {', '.join(unsupported)}")
+                    self._send_json_error(400, f'Format not supported: {", ".join(unsupported)}')
                     return
 
                 for file in files:
@@ -229,29 +229,29 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             elif command == 'encrypt':
                 success = VaultManager.encrypt_folder(path, form['key'].value)
-                check_error(success, "Path contains an encrypted folder", 400)
+                check_error(success, 'Path contains an encrypted folder', 400)
 
             elif command == 'verify':
                 success = VaultManager.is_key_valid(path, form['key'].value)
                 response = { 'success': success }
                 self._set_headers(200, 'application/json')
-                self._write(json.dumps(response).encode("utf-8"))
+                self._write(json.dumps(response).encode('utf-8'))
                 return
 
             elif command == 'decrypt':
                 success = VaultManager.decrypt_folder(path, form['key'].value)
-                check_error(success, "Forbidden", 403)
+                check_error(success, 'Forbidden', 403)
 
             else:
-                self._send_json_error(400, "Invalid command")
+                self._send_json_error(400, 'Invalid command')
                 return
 
         except VaultManager.InvalidPathError:
-            self._send_json_error(404, "Not found")
+            self._send_json_error(404, 'Not found')
 
         except:
-            Logs.warning("Server error:\n", traceback.format_exc())
-            self._send_json_error(500, "Server error")
+            Logs.warning('Server error:\n', traceback.format_exc())
+            self._send_json_error(500, 'Server error')
 
     # Override to prevent HTTP server from logging every request if ENABLE_LOGS is False
     def log_message(self, format, *args):
@@ -281,7 +281,7 @@ class VaultServer():
 
     @staticmethod
     def file_filter(name):
-        valid_ext = (".nanome", ".lua", ".pdb", ".sdf", ".cif", ".ppt", ".pptx", ".odp", ".pdf", ".png", ".jpg")
+        valid_ext = ('.nanome', '.lua', '.pdb', '.sdf', '.cif', '.ppt', '.pptx', '.odp', '.pdf', '.png', '.jpg')
         return name.endswith(valid_ext)
 
     @classmethod
@@ -289,7 +289,7 @@ class VaultServer():
         VaultServer.is_running = True
         VaultServer.keep_files_days = keep_files_days
 
-        server = ThreadedHTTPServer(("", port), RequestHandler)
+        server = ThreadedHTTPServer(('', port), RequestHandler)
 
         if ssl_cert is not None:
             import ssl

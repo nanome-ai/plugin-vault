@@ -76,7 +76,7 @@ class Vault(nanome.PluginInstance):
         self.menu_manager.home_page.Update()
 
     def load_file(self, name, callback):
-        item_name, extension = name.rsplit(".", 1)
+        item_name, extension = name.rsplit('.', 1)
 
         path = self.menu_manager.home_page.path
         file_path = VaultManager.get_vault_path(os.path.join(path, name))
@@ -223,7 +223,7 @@ class Vault(nanome.PluginInstance):
             s.close()
 
         if port != DEFAULT_SERVER_PORT:
-            url += ":" + str(port)
+            url += ':' + str(port)
         return url
 
 def main():
@@ -235,13 +235,13 @@ def main():
 
     try:
         for i in range(len(sys.argv)):
-            if sys.argv[i] == "-w":
+            if sys.argv[i] == '-w':
                 port = int(sys.argv[i + 1])
-            elif sys.argv[i] == "-s":
+            elif sys.argv[i] == '-s':
                 ssl_cert = sys.argv[i + 1]
-            elif sys.argv[i] == "-u":
+            elif sys.argv[i] == '-u':
                 url = sys.argv[i + 1]
-            elif sys.argv[i] == "-k":
+            elif sys.argv[i] == '-k':
                 keep_files_days = int(sys.argv[i + 1])
     except:
         pass
@@ -258,12 +258,12 @@ def main():
         server.stop()
 
     # Plugin
-    plugin = nanome.Plugin("Nanome Vault", "Use your browser to upload files and folders to make them available in Nanome.", "Loading", False)
+    plugin = nanome.Plugin('Nanome Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Loading', False)
     plugin.set_plugin_class(Vault)
     plugin.set_custom_data(url, port)
     plugin.pre_run = pre_run
     plugin.post_run = post_run
     plugin.run('127.0.0.1', 8888)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
