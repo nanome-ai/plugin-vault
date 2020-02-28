@@ -10,12 +10,13 @@ from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
 from nanome.api.structure import Complex
 
-from .VaultServer import VaultServer
+from .VaultServer import VaultServer, EXTENSIONS
 from .Menu.MenuManager import MenuManager, PageTypes
 from .PPTConverter import PPTConverter
 from . import VaultManager, Workspace
 
-DEFAULT_SERVER_PORT = 80
+DEFAULT_WEB_PORT = 80
+DEFAULT_CONVERTER_URL = 'http://vault-converter:3000'
 DEFAULT_KEEP_FILES_DAYS = 0
 
 # Plugin instance (for Nanome)
@@ -115,7 +116,7 @@ class Vault(nanome.PluginInstance):
             msg = f'Macro "{item_name}" added'
             callback()
 
-        elif self.can_send_files and extension not in ['ppt', 'pptx', 'odp']:
+        elif self.can_send_files and extension not in EXTENSIONS['converted']:
             self.send_files_to_load(file_path, lambda _: callback())
 
         # structure
@@ -228,37 +229,40 @@ class Vault(nanome.PluginInstance):
         finally:
             s.close()
 
-        if port != DEFAULT_SERVER_PORT:
+        if port != DEFAULT_WEB_PORT:
             url += ':' + str(port)
         return url
 
 def main():
     # Plugin server (for Web)
-    port = DEFAULT_SERVER_PORT
+    converter_url = DEFAULT_CONVERTER_URL
+    keep_files_days = DEFAULT_KEEP_FILES_DAYS
     ssl_cert = None
     url = None
-    keep_files_days = DEFAULT_KEEP_FILES_DAYS
+    port = DEFAULT_WEB_PORT
 
     try:
         for i in range(len(sys.argv)):
-            if sys.argv[i] == '-w':
-                port = int(sys.argv[i + 1])
-            elif sys.argv[i] == '-s':
-                ssl_cert = sys.argv[i + 1]
-            elif sys.argv[i] == '-u':
-                url = sys.argv[i + 1]
-            elif sys.argv[i] == '-k':
+            if sys.argv[i] in ['-c', '--converter-url']:
+                converter_url = sys.argv[i + 1]
+            elif sys.argv[i] in ['-k', '--keep-files-days']:
                 keep_files_days = int(sys.argv[i + 1])
+            elif sys.argv[i] in ['-s', '--ssl-cert']:
+                ssl_cert = sys.argv[i + 1]
+            elif sys.argv[i] in ['-u', '--url']:
+                url = sys.argv[i + 1]
+            elif sys.argv[i] in ['-w', '--web-port']:
+                port = int(sys.argv[i + 1])
     except:
         pass
 
-    if ssl_cert is not None and port == DEFAULT_SERVER_PORT:
+    if ssl_cert is not None and port == DEFAULT_WEB_PORT:
         port = 443
 
     server = None
     def pre_run():
         nonlocal server
-        server = VaultServer(port, ssl_cert, keep_files_days)
+        server = VaultServer(port, ssl_cert, keep_files_days, converter_url)
         server.start()
     def post_run():
         server.stop()

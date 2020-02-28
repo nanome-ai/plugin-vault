@@ -2,6 +2,7 @@ import cgi
 import json
 import os
 import re
+import requests
 import sys
 import traceback
 import urllib
@@ -43,8 +44,8 @@ POST_REQS = {
 }
 
 EXTENSIONS = {
-    'supported': ['nanome", "lua", "pdb", "sdf", "cif", "pdf", "png", "jpg'],
-    'converted': ['ppt", "pptx", "odp']
+    'supported': ['pdb', 'sdf', 'cif', 'pdf', 'png', 'jpg', 'nanome', 'lua'],
+    'converted': ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp']
 }
 
 SERVER_DIR = os.path.join(os.path.dirname(__file__), 'WebUI/dist')
@@ -219,10 +220,24 @@ class RequestHandler(BaseHTTPRequestHandler):
                     self._send_json(400, error=f'Format not supported: {", ".join(unsupported)}')
                     return
 
+                failed = []
                 for file in files:
-                    VaultManager.add_file(path, file.filename, file.file.read(), key)
+                    name = file.filename
+                    base, ext = name.rsplit('.', 1)
+                    if ext in EXTENSIONS['converted']:
+                        r = requests.post(VaultServer.converter_url + '/convert/office', files={name: file.file})
+                        if r.status_code == 200:
+                            name = base + '.pdf'
+                            content = r.content
+                        else:
+                            failed.append(name)
+                            continue
+                    else:
+                        content = file.file.read()
+                    VaultManager.add_file(path, name, content, key)
 
-                self._send_json(code=200)
+                data = {'failed': failed} if failed else {}
+                self._send_json(code=200, data=data)
                 return
 
             elif command == 'encrypt':
@@ -259,15 +274,16 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
 
     def finish_request(self, request, client_address):
-        request.settimeout(30)
+        request.settimeout(60)
         HTTPServer.finish_request(self, request, client_address)
 
 class VaultServer():
     is_running = False
-    keep_files_days = 0
+    converter_url = None
+    keep_files_days = None
 
-    def __init__(self, port, ssl_cert, keep_files_days):
-        self.__process = Process(target=VaultServer.start_process, args=(port, ssl_cert, keep_files_days))
+    def __init__(self, port, ssl_cert, keep_files_days, converter_url):
+        self.__process = Process(target=VaultServer.start_process, args=(port, ssl_cert, keep_files_days, converter_url))
 
     def start(self):
         self.__process.start()
@@ -281,8 +297,9 @@ class VaultServer():
         return ext in EXTENSIONS['supported'] + EXTENSIONS['converted']
 
     @classmethod
-    def start_process(cls, port, ssl_cert, keep_files_days):
+    def start_process(cls, port, ssl_cert, keep_files_days, converter_url):
         VaultServer.is_running = True
+        VaultServer.converter_url = converter_url
         VaultServer.keep_files_days = keep_files_days
 
         server = ThreadedHTTPServer(('', port), RequestHandler)
