@@ -42,6 +42,11 @@ POST_REQS = {
     'decrypt': ['key']
 }
 
+EXTENSIONS = {
+    'supported': ['nanome", "lua", "pdb", "sdf", "cif", "pdf", "png", "jpg'],
+    'converted': ['ppt", "pptx", "odp']
+}
+
 SERVER_DIR = os.path.join(os.path.dirname(__file__), 'WebUI/dist')
 
 # Class handling HTTP requests
@@ -99,6 +104,11 @@ class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self._parse_path()
         if not path: return
+
+        # get supported extensions info
+        if path == '/info':
+            self._send_json(data={'extensions': EXTENSIONS})
+            return
 
         base_dir = SERVER_DIR
         is_file = re.search(r'\.[^/]+$', path) is not None
@@ -267,8 +277,8 @@ class VaultServer():
 
     @staticmethod
     def file_filter(name):
-        valid_ext = ('.nanome', '.lua', '.pdb', '.sdf', '.cif', '.ppt', '.pptx', '.odp', '.pdf', '.png', '.jpg')
-        return name.endswith(valid_ext)
+        ext = name.split('.')[-1]
+        return ext in EXTENSIONS['supported'] + EXTENSIONS['converted']
 
     @classmethod
     def start_process(cls, port, ssl_cert, keep_files_days):
