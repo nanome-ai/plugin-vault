@@ -30,6 +30,12 @@ Vue.directive('click-out', {
   }
 })
 
+Vue.filter('extensions', extensions => {
+  if (!extensions) return ''
+  return extensions.map(ext => '.' + ext).join(', ')
+})
+
+store.dispatch('getInfo')
 store.dispatch('refresh')
 
 const app = new Vue({

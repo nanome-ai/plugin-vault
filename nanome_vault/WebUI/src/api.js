@@ -62,6 +62,10 @@ const API = {
     }
   },
 
+  getInfo() {
+    return request('/info')
+  },
+
   login({ username, password }) {
     const body = {
       login: username,

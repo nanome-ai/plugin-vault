@@ -7,12 +7,20 @@ Vue.use(Vuex)
 const state = {
   token: localStorage.getItem('user-token') || null,
   unique: null,
-  name: null
+  name: null,
+  extensions: {
+    supported: [],
+    converted: []
+  }
 }
 
 const mutations = {
   PATCH_USER(state, payload) {
     Object.assign(state, payload)
+  },
+
+  SET_EXTENSIONS(state, extensions) {
+    state.extensions = extensions
   }
 }
 
@@ -38,6 +46,11 @@ async function saveSession(commit, { success, results }) {
 }
 
 const actions = {
+  async getInfo({ commit }) {
+    const { extensions } = await API.getInfo()
+    commit('SET_EXTENSIONS', extensions)
+  },
+
   async login({ commit }, creds) {
     const data = await API.login(creds)
     return saveSession(commit, data)
