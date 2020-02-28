@@ -93,11 +93,17 @@ class Vault(nanome.PluginInstance):
 
         # workspace
         if extension == 'nanome':
-            with open(file_path, 'rb') as f:
-                workspace = Workspace.from_data(f.read())
-                self.update_workspace(workspace)
-            msg = f'Workspace "{item_name}" loaded'
-            callback()
+            try:
+                with open(file_path, 'rb') as f:
+                    workspace = Workspace.from_data(f.read())
+                    self.update_workspace(workspace)
+                msg = f'Workspace "{item_name}" loaded'
+            except:
+                Logs.warning('Workspace not saved with Vault, sending binary to Nanome:\n  ' + file_path)
+                # TODO: remove when callback on send_files_to_load .nanome works
+                self.send_files_to_load(file_path, lambda _: None)
+            finally:
+                callback()
 
         # macro
         elif extension == 'lua':
