@@ -4,6 +4,21 @@ if [ "$(docker ps -aq -f name=vault)" != "" ]; then
     docker rm -f vault
 fi
 
+if [ "$(docker network ls -qf name=vault-network)" == "" ]; then
+    echo "creating network"
+    docker network create --driver bridge vault-network
+fi
+
+if [ "$(docker ps -qf name=vault-converter)" == "" ]; then
+    echo "starting vault-converter"
+    docker run --rm -d \
+    --name vault-converter \
+    --network vault-network \
+    --env MAXIMUM_WAIT_TIMEOUT=60 \
+    --env DEFAULT_WAIT_TIMEOUT=60 \
+    thecodingmachine/gotenberg:6
+fi
+
 PORT=80
 ARGS=$*
 
@@ -20,6 +35,7 @@ done
 docker run -d \
 --name vault \
 --restart unless-stopped \
+--network vault-network \
 -p $PORT:$PORT \
 -e ARGS="$ARGS" \
 -v vault-volume:/root \
