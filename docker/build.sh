@@ -5,4 +5,4 @@ else
     docker volume create vault-volume
 fi
 
-docker build -f Dockerfile -t vault:latest ..
+docker build -f Dockerfile --build-arg CACHEBUST=$(date +%s) -t vault:latest ..
