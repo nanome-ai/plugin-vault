@@ -2,10 +2,12 @@ import sys
 import os
 import socket
 import tempfile
+from functools import partial
 
 import nanome
 from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
+from nanome.api.structure import Complex
 
 from .VaultServer import VaultServer, EXTENSIONS
 from .menus import VaultMenu
@@ -83,6 +85,20 @@ class Vault(nanome.PluginInstance):
             msg = f'Macro "{item_name}" added'
             callback()
 
+        # structure
+        elif extension == 'pdb':
+            complex = Complex.io.from_pdb(path=file_path)
+            complex.name = item_name
+            self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
+        elif extension == 'sdf':
+            complex = Complex.io.from_sdf(path=file_path)
+            complex.name = item_name
+            self.bonds_ready([complex], callback)
+        elif extension == 'cif':
+            complex = Complex.io.from_mmcif(path=file_path)
+            complex.name = item_name
+            self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
+
         elif extension in EXTENSIONS['supported']:
             self.send_files_to_load(file_path, lambda _: callback())
 
@@ -129,6 +145,14 @@ class Vault(nanome.PluginInstance):
 
         temp.close() # unsure if needed
         os.remove(temp.name)
+
+    def bonds_ready(self, complexes, callback):
+        self.add_dssp(complexes, partial(self.send_complexes, callback=callback))
+
+    def send_complexes(self, complexes, callback):
+        self.add_to_workspace(complexes)
+        self.send_notification(NotificationTypes.success, f'"{complexes[0].name}" loaded')
+        callback()
 
     def get_server_url(self):
         url, port = self.custom_data
