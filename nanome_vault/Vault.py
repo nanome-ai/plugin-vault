@@ -8,7 +8,7 @@ from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
 
 from .VaultServer import VaultServer, EXTENSIONS
-from .Menu.MenuManager import MenuManager
+from .menus import VaultMenu
 from . import VaultManager, Workspace
 
 DEFAULT_WEB_PORT = 80
@@ -24,13 +24,13 @@ class Vault(nanome.PluginInstance):
         nanome.api.macro.Macro.set_plugin_identifier('')
 
         self.account = 'user-00000000'
-        self.menu_manager = MenuManager(self, self.get_server_url())
+        self.menu = VaultMenu(self, self.get_server_url())
         self.on_run()
 
     def on_run(self):
         self.on_presenter_change()
-        self.menu_manager.Refresh()
-        self.menu_manager.home_page.OpenFolder('.')
+        self.menu.open_folder('.')
+        self.menu.show_menu()
 
     def on_presenter_change(self):
         self.request_presenter_info(self.update_account)
@@ -41,17 +41,17 @@ class Vault(nanome.PluginInstance):
 
         self.account = info.account_id
         VaultManager.create_path(self.account)
-        self.menu_manager.home_page.Update()
+        self.menu.update()
 
     def load_file(self, name, callback):
         item_name, extension = name.rsplit('.', 1)
 
-        path = self.menu_manager.home_page.path
+        path = self.menu.path
         file_path = VaultManager.get_vault_path(os.path.join(path, name))
 
         temp = None
-        if self.menu_manager.home_page.locked_path:
-            key = self.menu_manager.home_page.folder_key
+        if self.menu.locked_path:
+            key = self.menu.folder_key
             temp = tempfile.TemporaryDirectory()
             temp_path = os.path.join(temp.name, name)
             VaultManager.decrypt_file(file_path, key, temp_path)
@@ -120,8 +120,8 @@ class Vault(nanome.PluginInstance):
             item.io.to_mmcif(temp.name)
 
         with open(temp.name, 'rb') as f:
-            path = VaultManager.get_vault_path(self.menu_manager.home_page.path)
-            key = self.menu_manager.home_page.folder_key
+            path = VaultManager.get_vault_path(self.menu.path)
+            key = self.menu.folder_key
             file_name = f'{name}.{extension}'
 
             VaultManager.add_file(path, file_name, f.read(), key)
