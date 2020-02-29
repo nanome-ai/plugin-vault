@@ -3,6 +3,7 @@ import sys
 from functools import partial
 
 import nanome
+from nanome.util import Color
 
 from .. import VaultManager
 
@@ -25,6 +26,11 @@ class VaultMenu:
         root = self.menu.root
 
         self.pfb_list_item = nanome.ui.LayoutNode.io.from_json(LIST_ITEM_PATH)
+        btn = self.pfb_list_item.find_node('ButtonNode').get_content()
+        btn.outline.active = False
+        btn.mesh.active = True
+        btn.mesh.enabled.idle = False
+        btn.mesh.color.highlighted = Color(whole_num=0x2fdbbfff)
 
         # outer wrapper components
         def open_url(button):
@@ -42,7 +48,7 @@ class VaultMenu:
         self.btn_up.icon.active = True
         self.btn_up.icon.value.set_all(UP_ICON_PATH)
         self.btn_up.icon.size = 0.5
-        self.btn_up.icon.color.unusable = nanome.util.Color.Grey()
+        self.btn_up.icon.color.unusable = Color.Grey()
 
         self.btn_upload = root.find_node('UploadButton').get_content()
         self.btn_upload.register_pressed_callback(self.toggle_upload)
