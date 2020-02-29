@@ -8,22 +8,16 @@ from .. import VaultManager
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 MENU_PATH = os.path.join(BASE_DIR, "Menu.json")
-PPT_TAB_PATH = os.path.join(BASE_DIR, "PPTTab.json")
-IMAGE_TAB_PATH = os.path.join(BASE_DIR, "ImageTab.json")
 LIST_ITEM_PATH = os.path.join(BASE_DIR, "ListItem.json")
 UP_ICON_PATH = os.path.join(BASE_DIR, "UpIcon.png")
 LOCK_ICON_PATH = os.path.join(BASE_DIR, "LockIcon.png")
 
 class Prefabs(object):
     tab_prefab = None
-    ppt_prefab = None
-    image_prefab = None
     list_item_prefab = None
 
 class PageTypes(nanome.util.IntEnum):
     Home = 1
-    Image = 2
-    PPT = 3
 
 #Singleton class.
 class MenuManager(object):
@@ -45,8 +39,6 @@ class MenuManager(object):
 
     def ReadJsons(self):
         self.plugin.menu = nanome.ui.Menu.io.from_json(MENU_PATH)
-        Prefabs.ppt_prefab = nanome.ui.LayoutNode.io.from_json(PPT_TAB_PATH).get_children()[0]
-        Prefabs.image_prefab = nanome.ui.LayoutNode.io.from_json(IMAGE_TAB_PATH).get_children()[0]
         Prefabs.list_item_prefab = nanome.ui.LayoutNode.io.from_json(LIST_ITEM_PATH)
         Prefabs.tab_prefab = self.plugin.menu.root.find_node("TabPrefab")
         Prefabs.tab_prefab.parent.remove_child(Prefabs.tab_prefab)
@@ -551,43 +543,3 @@ class MenuManager(object):
             self.plugin.save_file(self.upload_item, self.upload_name, self.upload_ext)
             self.ToggleUpload(show=False)
             self.Update()
-
-    class ImagePage(Page):
-        def __init__(self, image, name):
-            MenuManager.Page.__init__(self, name, Prefabs.tab_prefab, Prefabs.image_prefab)
-            self.type = PageTypes.Image
-            self.image = image
-            self.image_content = self.base.find_node("ImageContent").add_new_image(image)
-            self.image_content.scaling_option = nanome.util.enums.ScalingOptions.fit
-
-    class PPTPage(Page):
-        def __init__(self, images, name):
-            MenuManager.Page.__init__(self, name, Prefabs.tab_prefab, Prefabs.ppt_prefab)
-            self.type = PageTypes.PPT
-            self.images = images
-            self.prev_button = self.base.find_node("PrevButton").get_content()
-            self.next_button = self.base.find_node("NextButton").get_content()
-            self.page_text = self.base.find_node("PageText").get_content()
-            self.ppt_content = self.base.find_node("PPTContent").add_new_image()
-            self.ppt_content.scaling_option = nanome.util.enums.ScalingOptions.fit
-
-            self.current_slide = 0
-            def move_next(button):
-                next_slide = (self.current_slide+1) % len(self.images)
-                self.change_slide(next_slide)
-                MenuManager.RefreshMenu(self.ppt_content)
-                MenuManager.RefreshMenu(self.page_text)
-            def move_prev(button):
-                next_slide = (self.current_slide-1) % len(self.images)
-                self.change_slide(next_slide)
-                MenuManager.RefreshMenu(self.ppt_content)
-                MenuManager.RefreshMenu(self.page_text)
-            self.prev_button.register_pressed_callback(move_prev)
-            self.next_button.register_pressed_callback(move_next)
-            self.change_slide(0)
-
-        def change_slide(self, index):
-            num_slides = len(self.images)
-            self.current_slide = index
-            self.ppt_content.file_path = self.images[index]
-            self.page_text.text_value = str(self.current_slide+1) + "/" + str(num_slides)
