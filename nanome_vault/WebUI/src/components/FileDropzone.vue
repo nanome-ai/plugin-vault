@@ -119,12 +119,12 @@ export default {
       const convert = []
       for (const file of files) {
         const isSupported = this.allExtensions.some(ext => {
-          return file.name.toLowerCase().endsWith(ext)
+          return file.name.toLowerCase().endsWith('.' + ext)
         })
         isSupported ? upload.push(file) : skipped.push(file)
 
         const needsConvert = this.extensions.converted.some(ext => {
-          return file.name.toLowerCase().endsWith(ext)
+          return file.name.toLowerCase().endsWith('.' + ext)
         })
         if (needsConvert) convert.push(file)
       }
