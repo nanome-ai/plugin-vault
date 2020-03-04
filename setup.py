@@ -34,7 +34,8 @@ setup(
         "nanome_vault": [
             "WebUI/dist/*",
             "WebUI/dist/*/*",
-            "Menu/*",
+            "menus/icons/*",
+            "menus/json/*",
         ]
 	},
 )
