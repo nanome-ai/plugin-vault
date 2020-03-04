@@ -9,7 +9,9 @@
 
     <p class="text-lg pt-2 pb-4">
       Drag and drop or click the new file button to upload files.<br />
-      Supports <b>{{ extensions.join(' ') }}</b>
+      Supports <b>{{ extensions.supported | extensions }}</b>
+      <br />
+      Converts to PDF <b>{{ extensions.converted | extensions }}</b>
     </p>
 
     <div class="text-left">
@@ -32,12 +34,12 @@
 </template>
 
 <script>
+import { mapState } from 'vuex'
 import FileExplorer from '@/components/FileExplorer'
-import extensions from '@/helpers/extensions'
 
 export default {
   components: { FileExplorer },
-  data: () => ({ extensions })
+  computed: mapState(['extensions'])
 }
 </script>
 

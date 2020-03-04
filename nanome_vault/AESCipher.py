@@ -6,7 +6,7 @@ from Crypto.Util.Padding import pad, unpad
 # brute force protection, key is hashed 8192 times
 def get_key(key):
     key = key.encode('utf-8')
-    for i in range(8192):
+    for _ in range(8192):
         key = SHA256.new(key).digest()
     return key
 

@@ -149,12 +149,12 @@ def encrypt_folder(path, key):
     path = get_vault_path(path)
 
     # check if subfolder already encrypted
-    for root, dirs, files in os.walk(path):
+    for root, _, files in os.walk(path):
         if '.locked' in files:
             return False
 
     # encrypt all files not starting with '.'
-    for root, dirs, files in os.walk(path):
+    for root, _, files in os.walk(path):
         for file in [f for f in files if not f.startswith('.')]:
             file = os.path.join(root, file)
             encrypt_file(file, key, file)
@@ -175,7 +175,7 @@ def decrypt_folder(path, key):
         return False
 
     # decrypt all files not starting with '.'
-    for root, dirs, files in os.walk(path):
+    for root, _, files in os.walk(path):
         for file in [f for f in files if not f.startswith('.')]:
             file = os.path.join(root, file)
             decrypt_file(file, key, file)

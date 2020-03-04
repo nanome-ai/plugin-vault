@@ -2,8 +2,11 @@ FROM continuumio/miniconda3
 
 ENV ARGS=''
 
-RUN pip install nanome pycryptodome
 RUN conda install -c openbabel openbabel
+RUN pip install pycryptodome
+
+ARG CACHEBUST
+RUN pip install nanome
 
 COPY . /app
 WORKDIR /app

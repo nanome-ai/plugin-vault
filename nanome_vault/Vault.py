@@ -3,19 +3,18 @@ import os
 import socket
 import tempfile
 from functools import partial
-from timeit import default_timer as timer
 
 import nanome
 from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
 from nanome.api.structure import Complex
 
-from .VaultServer import VaultServer
-from .Menu.MenuManager import MenuManager, PageTypes
-from .PPTConverter import PPTConverter
+from .VaultServer import VaultServer, EXTENSIONS
+from .menus import VaultMenu
 from . import VaultManager, Workspace
 
-DEFAULT_SERVER_PORT = 80
+DEFAULT_WEB_PORT = 80
+DEFAULT_CONVERTER_URL = 'http://vault-converter:3000'
 DEFAULT_KEEP_FILES_DAYS = 0
 
 # Plugin instance (for Nanome)
@@ -26,43 +25,14 @@ class Vault(nanome.PluginInstance):
         # set to empty string to read/write macros in Macros folder
         nanome.api.macro.Macro.set_plugin_identifier('')
 
-        # "hack" to check if Nanome supports send_files_to_load
-        self.can_send_files = self._network._ProcessNetwork__version_table.get('LoadFile') != None
-
-        self.running = False
-        self.ppt_readers = {}
         self.account = 'user-00000000'
-        self.menu_manager = MenuManager(self, self.get_server_url())
+        self.menu = VaultMenu(self, self.get_server_url())
         self.on_run()
 
-    def update(self):
-        if not self.running:
-            return
-
-        if self.menu_manager.selected_page == self.menu_manager.home_page:
-            if timer() - self.__timer >= 3.0:
-                for ppt_reader in self.ppt_readers.values():
-                    ppt_reader.update()
-
-                self.menu_manager.home_page.Update()
-                self.__timer = timer()
-
-        if timer() - self.big_timer >= 600:
-            filtered_ppt_readers = {}
-            for file in self.menu_manager.GetOpenFiles():
-                for key, value in self.ppt_readers.items():
-                    if not value.done or key.startswith(file):
-                        filtered_ppt_readers[key] = value
-            self.ppt_readers = filtered_ppt_readers
-            self.big_timer = timer()
-
     def on_run(self):
-        self.running = True
-        self.__timer = timer()
-        self.big_timer = timer()
         self.on_presenter_change()
-        self.menu_manager.Refresh()
-        self.menu_manager.home_page.OpenFolder('.')
+        self.menu.open_folder('.')
+        self.menu.show_menu()
 
     def on_presenter_change(self):
         self.request_presenter_info(self.update_account)
@@ -73,17 +43,17 @@ class Vault(nanome.PluginInstance):
 
         self.account = info.account_id
         VaultManager.create_path(self.account)
-        self.menu_manager.home_page.Update()
+        self.menu.update()
 
     def load_file(self, name, callback):
         item_name, extension = name.rsplit('.', 1)
 
-        path = self.menu_manager.home_page.path
+        path = self.menu.path
         file_path = VaultManager.get_vault_path(os.path.join(path, name))
 
         temp = None
-        if self.menu_manager.home_page.locked_path:
-            key = self.menu_manager.home_page.folder_key
+        if self.menu.locked_path:
+            key = self.menu.folder_key
             temp = tempfile.TemporaryDirectory()
             temp_path = os.path.join(temp.name, name)
             VaultManager.decrypt_file(file_path, key, temp_path)
@@ -115,9 +85,6 @@ class Vault(nanome.PluginInstance):
             msg = f'Macro "{item_name}" added'
             callback()
 
-        elif self.can_send_files and extension not in ['ppt', 'pptx', 'odp']:
-            self.send_files_to_load(file_path, lambda _: callback())
-
         # structure
         elif extension == 'pdb':
             complex = Complex.io.from_pdb(path=file_path)
@@ -132,11 +99,8 @@ class Vault(nanome.PluginInstance):
             complex.name = item_name
             self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
 
-        # document/image
-        elif extension in ['ppt', 'pptx', 'odp', 'pdf']:
-            self.display_ppt(file_path, callback)
-        elif extension in ['png', 'jpg']:
-            self.display_image(item_name, file_path, callback)
+        elif extension in EXTENSIONS['supported']:
+            self.send_files_to_load(file_path, lambda _: callback())
 
         else:
             error = f'Extension not yet supported: {extension}'
@@ -172,8 +136,8 @@ class Vault(nanome.PluginInstance):
             item.io.to_mmcif(temp.name)
 
         with open(temp.name, 'rb') as f:
-            path = VaultManager.get_vault_path(self.menu_manager.home_page.path)
-            key = self.menu_manager.home_page.folder_key
+            path = VaultManager.get_vault_path(self.menu.path)
+            key = self.menu.folder_key
             file_name = f'{name}.{extension}'
 
             VaultManager.add_file(path, file_name, f.read(), key)
@@ -190,30 +154,6 @@ class Vault(nanome.PluginInstance):
         self.send_notification(NotificationTypes.success, f'"{complexes[0].name}" loaded')
         callback()
 
-    def display_ppt(self, file_name, callback):
-        key = os.path.basename(file_name) + str(os.path.getmtime(file_name))
-        if key in self.ppt_readers:
-            ppt_reader = self.ppt_readers[key]
-        else:
-            ppt_reader = PPTConverter(file_name)
-            self.ppt_readers[key] = ppt_reader
-        def done_delegate(images):
-            if len(images) == 1:
-                self.menu_manager.OpenPage(PageTypes.Image, images[0], file_name)
-            elif len(images) > 1:
-                self.menu_manager.OpenPage(PageTypes.PPT, images, file_name)
-            if callback:
-                callback()
-        def error_delegate():
-            #cleanup ppt_reader
-            pass
-        ppt_reader.Convert(done_delegate, error_delegate)
-
-    def display_image(self, name, path, callback):
-        self.menu_manager.OpenPage(PageTypes.Image, path, name)
-        if callback:
-            callback()
-
     def get_server_url(self):
         url, port = self.custom_data
         if url is not None:
@@ -228,37 +168,40 @@ class Vault(nanome.PluginInstance):
         finally:
             s.close()
 
-        if port != DEFAULT_SERVER_PORT:
+        if port != DEFAULT_WEB_PORT:
             url += ':' + str(port)
         return url
 
 def main():
     # Plugin server (for Web)
-    port = DEFAULT_SERVER_PORT
+    converter_url = DEFAULT_CONVERTER_URL
+    keep_files_days = DEFAULT_KEEP_FILES_DAYS
     ssl_cert = None
     url = None
-    keep_files_days = DEFAULT_KEEP_FILES_DAYS
+    port = DEFAULT_WEB_PORT
 
     try:
-        for i in range(len(sys.argv)):
-            if sys.argv[i] == '-w':
-                port = int(sys.argv[i + 1])
-            elif sys.argv[i] == '-s':
-                ssl_cert = sys.argv[i + 1]
-            elif sys.argv[i] == '-u':
-                url = sys.argv[i + 1]
-            elif sys.argv[i] == '-k':
+        for i, arg in enumerate(sys.argv):
+            if arg in ['-c', '--converter-url']:
+                converter_url = sys.argv[i + 1]
+            elif arg in ['-k', '--keep-files-days']:
                 keep_files_days = int(sys.argv[i + 1])
+            elif arg in ['-s', '--ssl-cert']:
+                ssl_cert = sys.argv[i + 1]
+            elif arg in ['-u', '--url']:
+                url = sys.argv[i + 1]
+            elif arg in ['-w', '--web-port']:
+                port = int(sys.argv[i + 1])
     except:
         pass
 
-    if ssl_cert is not None and port == DEFAULT_SERVER_PORT:
+    if ssl_cert is not None and port == DEFAULT_WEB_PORT:
         port = 443
 
     server = None
     def pre_run():
         nonlocal server
-        server = VaultServer(port, ssl_cert, keep_files_days)
+        server = VaultServer(port, ssl_cert, keep_files_days, converter_url)
         server.start()
     def post_run():
         server.stop()

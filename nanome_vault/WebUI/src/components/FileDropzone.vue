@@ -16,13 +16,13 @@
       <input
         class="visually-hidden"
         @change="onChange"
-        :accept="extensions.join(',')"
+        :accept="allExtensions | extensions"
         type="file"
         multiple
       />
       <div class="text-4xl">
         <template v-if="isUploading">
-          Uploading files...
+          Uploading {{ isConverting ? 'and converting' : '' }} files...
         </template>
         <template v-else-if="!numDropping">
           Drop items or
@@ -46,9 +46,9 @@
 </template>
 
 <script>
+import { mapState } from 'vuex'
 import API from '@/api'
 import { getFiles } from '@/helpers/files'
-import extensions from '@/helpers/extensions'
 
 export default {
   props: {
@@ -56,13 +56,21 @@ export default {
   },
 
   data: () => ({
-    extensions,
     showDropzone: false,
     isHovering: false,
+    isConverting: false,
     isUploading: false,
     numDropping: 0,
     numEvents: 0
   }),
+
+  computed: {
+    ...mapState(['extensions']),
+
+    allExtensions() {
+      return this.extensions.supported.concat(this.extensions.converted)
+    }
+  },
 
   created() {
     document.body.addEventListener('dragenter', this.onDragEnter)
@@ -108,22 +116,57 @@ export default {
 
       const skipped = []
       const upload = []
+      const convert = []
       for (const file of files) {
-        const isSupported = this.extensions.some(ext => {
-          return file.name.toLowerCase().endsWith(ext)
+        const isSupported = this.allExtensions.some(ext => {
+          return file.name.toLowerCase().endsWith('.' + ext)
         })
         isSupported ? upload.push(file) : skipped.push(file)
+
+        const needsConvert = this.extensions.converted.some(ext => {
+          return file.name.toLowerCase().endsWith('.' + ext)
+        })
+        if (needsConvert) convert.push(file)
       }
 
-      if (upload.length) {
+      let confirmUpload = true
+      if (convert.length) {
+        const list = convert.map(f => f.name).join('<br>')
+        confirmUpload = await this.$modal.confirm({
+          title: `Convert to PDF`,
+          body:
+            `Files will be converted to PDF:<br>${list}` +
+            '<br><br><b>NOTE:</b> This can take a while.',
+          okTitle: 'upload'
+        })
+        this.isConverting = true
+      }
+
+      if (upload.length && confirmUpload) {
         const path = this.path === '/' ? '/shared/' : this.path
-        await API.upload(path, upload)
-        this.$emit('upload')
-        if (path !== this.path) {
-          this.$router.push(path)
+        const res = await API.upload(path, upload)
+
+        if (res.code !== 200) {
+          this.$modal.alert({
+            title: 'Upload Failed',
+            body: res.error
+          })
+        } else {
+          this.$emit('upload')
+          if (res.failed) {
+            const list = res.failed.join('<br>')
+            this.$modal.alert({
+              title: 'Convert Failed',
+              body: `Files were unable to be converted:<br>${list}`
+            })
+          }
+          if (path !== this.path) {
+            this.$router.push(path)
+          }
         }
       }
 
+      this.isConverting = false
       this.isUploading = false
       this.showDropzone = false
 
