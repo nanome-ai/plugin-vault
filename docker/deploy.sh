@@ -14,6 +14,7 @@ if [ "$(docker ps -qf name=vault-converter)" == "" ]; then
     docker run --rm -d \
     --name vault-converter \
     --network vault-network \
+    --env DISABLE_GOOGLE_CHROME=1 \
     --env MAXIMUM_WAIT_TIMEOUT=60 \
     --env DEFAULT_WAIT_TIMEOUT=60 \
     thecodingmachine/gotenberg:6
@@ -24,7 +25,7 @@ ARGS=$*
 
 while [ "$1" != "" ]; do
     case $1 in
-        -w)
+        -w | --web-port )
             shift
             PORT=$1
             ;;
