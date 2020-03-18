@@ -2,6 +2,7 @@ __pycache__
 /.vscode
 /build
 /dist
+docker/.cachebust
 nanome_vault.egg-info
 nanome
 node_modules
