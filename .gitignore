@@ -1,8 +1,8 @@
 __pycache__
+node_modules
 /.vscode
 /build
 /dist
-docker/.cachebust
-nanome_vault.egg-info
-nanome
-node_modules
+/docker/.cachebust
+*.egg-info
+*.log
