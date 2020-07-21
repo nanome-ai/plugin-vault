@@ -7,13 +7,6 @@
       <h2>Upload files to make them available in Nanome!</h2>
     </header>
 
-    <p class="text-lg pt-2 pb-4">
-      Drag and drop or click the new file button to upload files.<br />
-      Supports <b>{{ extensions.supported | extensions }}</b>
-      <br />
-      Converts to PDF <b>{{ extensions.converted | extensions }}</b>
-    </p>
-
     <div v-if="authEnabled && !token">
       <button @click="$modal.login()" class="text-4xl btn rounded-lg mt-32">
         <div class="my-5 mx-24">
@@ -24,6 +17,13 @@
     </div>
 
     <template v-else>
+      <p class="text-lg pt-2 pb-4">
+        Drag and drop or click the new file button to upload files.<br />
+        Supports <b>{{ extensions.supported | extensions }}</b>
+        <br />
+        Converts to PDF <b>{{ extensions.converted | extensions }}</b>
+      </p>
+
       <div class="text-left">
         <div
           class="text-lg text-left px-4 py-2 ml-4 rounded bg-gray-200 inline"
