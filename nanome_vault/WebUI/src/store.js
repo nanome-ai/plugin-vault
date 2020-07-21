@@ -5,6 +5,7 @@ import API from '@/api'
 Vue.use(Vuex)
 
 const state = {
+  authEnabled: false,
   token: localStorage.getItem('user-token') || null,
   unique: null,
   name: null,
@@ -15,6 +16,10 @@ const state = {
 }
 
 const mutations = {
+  AUTH_ENABLED(state) {
+    state.authEnabled = true
+  },
+
   PATCH_USER(state, payload) {
     Object.assign(state, payload)
   },

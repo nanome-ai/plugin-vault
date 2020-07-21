@@ -175,6 +175,7 @@ class Vault(nanome.PluginInstance):
 def main():
     # Plugin server (for Web)
     converter_url = DEFAULT_CONVERTER_URL
+    enable_auth = False
     keep_files_days = DEFAULT_KEEP_FILES_DAYS
     ssl_cert = None
     url = None
@@ -184,6 +185,8 @@ def main():
         for i, arg in enumerate(sys.argv):
             if arg in ['-c', '--converter-url']:
                 converter_url = sys.argv[i + 1]
+            elif arg in ['--enable-auth']:
+                enable_auth = True
             elif arg in ['-k', '--keep-files-days']:
                 keep_files_days = int(sys.argv[i + 1])
             elif arg in ['-s', '--ssl-cert']:
@@ -201,7 +204,7 @@ def main():
     server = None
     def pre_run():
         nonlocal server
-        server = VaultServer(port, ssl_cert, keep_files_days, converter_url)
+        server = VaultServer(port, ssl_cert, keep_files_days, converter_url, enable_auth)
         server.start()
     def post_run():
         server.stop()

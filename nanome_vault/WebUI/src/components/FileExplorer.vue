@@ -123,11 +123,11 @@ export default {
   mounted() {
     this.$root.$on('contextmenu', this.showContextMenu)
     this.$root.$on('download', API.download)
-  },
 
-  destroyed() {
-    this.$root.$off('contextmenu', this.showContextMenu)
-    this.$root.$off('download', API.download)
+    this.$once('hook:beforeDestroy', () => {
+      this.$root.$off('contextmenu', this.showContextMenu)
+      this.$root.$off('download', API.download)
+    })
   },
 
   methods: {

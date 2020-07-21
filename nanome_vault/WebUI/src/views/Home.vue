@@ -14,22 +14,35 @@
       Converts to PDF <b>{{ extensions.converted | extensions }}</b>
     </p>
 
-    <div class="text-left">
-      <div class="text-lg text-left px-4 py-2 ml-4 rounded bg-gray-200 inline">
-        <template v-if="$store.state.name">
-          Welcome <b>{{ $store.state.name }}!</b>&nbsp;
-          <a @click="$store.dispatch('logout')" class="link text-red-500"
-            >log out</a
-          >
-        </template>
-        <template v-else>
-          Welcome!
-          <a @click="$modal.login()" class="link text-blue-500">log in</a>
-        </template>
-      </div>
+    <div v-if="authEnabled && !token">
+      <button @click="$modal.login()" class="text-4xl btn rounded-lg mt-32">
+        <div class="my-5 mx-24">
+          <fa-icon class="text-6xl" icon="lock" />
+          <div>Access Vault</div>
+        </div>
+      </button>
     </div>
 
-    <file-explorer />
+    <template v-else>
+      <div class="text-left">
+        <div
+          class="text-lg text-left px-4 py-2 ml-4 rounded bg-gray-200 inline"
+        >
+          <template v-if="name">
+            Welcome <b>{{ name }}!</b>&nbsp;
+            <a @click="$store.dispatch('logout')" class="link text-red-500"
+              >log out</a
+            >
+          </template>
+          <template v-else>
+            Welcome!
+            <a @click="$modal.login()" class="link text-blue-500">log in</a>
+          </template>
+        </div>
+      </div>
+
+      <file-explorer />
+    </template>
   </div>
 </template>
 
@@ -39,7 +52,7 @@ import FileExplorer from '@/components/FileExplorer'
 
 export default {
   components: { FileExplorer },
-  computed: mapState(['extensions'])
+  computed: mapState(['authEnabled', 'token', 'name', 'extensions'])
 }
 </script>
 

@@ -53,6 +53,10 @@ and add `-c http://localhost:3000` as an argument when you start the plugin.
 
   The url of the Gotenberg service to use for conversion. Defaults to `http://vault-converter:3000` for use inside Docker. Example: `-c http://localhost:3000`
 
+- `--enable-auth`
+
+  Enables enforced authentication, preventing users from accessing files in the Web UI unless they are logged in.
+
 - `-k days` or `--keep-files-days days`
 
   Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `-k 14`
