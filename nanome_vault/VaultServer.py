@@ -310,6 +310,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
+    daemon_threads = True
 
     def finish_request(self, request, client_address):
         request.settimeout(60)
