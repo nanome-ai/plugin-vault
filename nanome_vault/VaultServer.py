@@ -81,7 +81,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         user = None
         if cached:
             user = cached['user']
-            cached['access'] = datetime.today()
+            cached['access'] = datetime.now()
 
         search = re.search(r'^user-[0-9a-f]{8}', path)
         if search is not None:
@@ -318,6 +318,9 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 class VaultServer():
     is_running = False
+    last_auth_cleanup = None
+    last_file_cleanup = None
+
     converter_url = None
     enable_auth = False
     keep_files_days = None
@@ -341,6 +344,9 @@ class VaultServer():
     @classmethod
     def start_process(cls, port, ssl_cert, keep_files_days, converter_url, enable_auth):
         VaultServer.is_running = True
+        VaultServer.last_auth_cleanup = datetime.now()
+        VaultServer.last_file_cleanup = datetime.now()
+
         VaultServer.converter_url = converter_url
         VaultServer.enable_auth = enable_auth
         VaultServer.keep_files_days = keep_files_days
@@ -379,20 +385,33 @@ class VaultServer():
     @staticmethod
     def auth_cleanup():
         while VaultServer.is_running:
-            expiry_time = datetime.today() - timedelta(hours=1)
+            sleep(1)
+            now = datetime.now()
+
+            # only run auth cleanup every 10 minutes
+            if now - VaultServer.last_auth_cleanup < timedelta(minutes=10):
+                continue
+
+            VaultServer.last_auth_cleanup = now
+            expiry_time = now - timedelta(hours=1)
 
             # check token last accessed time and remove those older than 1 hour
             for token in list(VaultServer.auth_cache):
                 if VaultServer.auth_cache[token]['access'] < expiry_time:
                     del VaultServer.auth_cache[token]
 
-            # wait 10 minutes
-            sleep(600)
-
     @staticmethod
     def file_cleanup():
         while VaultServer.is_running:
-            expiry_date = datetime.today() - timedelta(days=VaultServer.keep_files_days)
+            sleep(1)
+            now = datetime.now()
+
+            # only run file cleanup every 5 minutes
+            if now - VaultServer.last_file_cleanup < timedelta(minutes=5):
+                continue
+
+            VaultServer.last_file_cleanup = now
+            expiry_date = now - timedelta(days=VaultServer.keep_files_days)
 
             # check file last accessed time and remove those older than keep_files_days
             for root, _, files in os.walk(VaultManager.FILES_DIR):
@@ -402,6 +421,3 @@ class VaultServer():
 
                     if last_accessed < expiry_date:
                         os.remove(file_path)
-
-            # wait 5 minutes
-            sleep(300)
