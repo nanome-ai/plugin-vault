@@ -71,12 +71,16 @@ class RequestHandler(BaseHTTPRequestHandler):
         cached = VaultServer.auth_cache.get(token, None)
 
         if cached is None:
-            headers = {'authorization': auth}
-            r = requests.get('https://api.nanome.ai/user/session', headers=headers)
-            if r.status_code == 200:
-                json = r.json()
-                cached = {'user': json['results']['user']['unique']}
-                VaultServer.auth_cache[token] = cached
+            try:
+                headers = {'authorization': auth}
+                r = requests.get('https://api.nanome.ai/user/session', headers=headers, timeout=10)
+                r.raise_for_status()
+                if r.status_code == 200:
+                    json = r.json()
+                    cached = {'user': json['results']['user']['unique']}
+                    VaultServer.auth_cache[token] = cached
+            except:
+                return False
 
         user = None
         if cached:
