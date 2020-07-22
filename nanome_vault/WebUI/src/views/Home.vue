@@ -1,23 +1,27 @@
 <template>
   <div class="home min-h-full container m-auto bg-white flex flex-col">
-    <header class="pt-10 mx-auto">
-      <h1 class="inline-flex items-baseline">
+    <header class="mb-4 mx-auto text-white">
+      <div class="inline-flex items-baseline text-5xl">
         <img class="mr-4" src="@/assets/logo.png" /> Vault
-      </h1>
-      <h2>Upload files to make them available in Nanome!</h2>
+      </div>
     </header>
+    <h1 class="font-bold">Upload Files to Nanome</h1>
 
     <div v-if="authEnabled && !token">
-      <button @click="$modal.login()" class="text-4xl btn rounded-lg mt-32">
-        <div class="my-5 mx-24">
-          <fa-icon class="text-6xl" icon="lock" />
-          <div>Access Vault</div>
+      <p class="text-lg mt-4 mb-8">
+        Access shared content from the community <br />or share your own with
+        people in your Nanome sessions.
+      </p>
+      <button @click="$modal.login()" class="text-3xl btn primary rounded-lg">
+        <div class="my-2 mx-8">
+          <fa-icon class="mr-2" icon="lock" />
+          Access Vault
         </div>
       </button>
     </div>
 
     <template v-else>
-      <p class="text-lg pt-2 pb-4">
+      <p class="text-lg mb-8">
         Drag and drop or click the new file button to upload files.<br />
         Supports <b>{{ extensions.supported | extensions }}</b>
         <br />
@@ -25,9 +29,7 @@
       </p>
 
       <div class="text-left">
-        <div
-          class="text-lg text-left px-4 py-2 ml-4 rounded bg-gray-200 inline"
-        >
+        <div class="text-lg px-4 py-2 ml-4 rounded bg-gray-200 inline">
           <template v-if="name">
             Welcome <b>{{ name }}!</b>&nbsp;
             <a @click="$store.dispatch('logout')" class="link text-red-500"
@@ -58,6 +60,15 @@ export default {
 
 <style lang="scss">
 header {
+  width: 100%;
+
+  padding: 2em 0 4em;
+  background: radial-gradient(
+    circle at 50% -450px,
+    var(--primary) 600px,
+    transparent 601px
+  );
+
   img {
     height: 1em;
   }
