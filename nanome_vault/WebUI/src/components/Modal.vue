@@ -42,6 +42,17 @@
                 forgot password?
               </a>
             </p>
+
+            <p class="text-xs text-gray-700">
+              Don't have a Nanome account?
+              <a
+                href="https://home.nanome.ai/register"
+                target="_blank"
+                class="link text-blue-500"
+              >
+                Register here
+              </a>
+            </p>
           </template>
         </div>
       </div>

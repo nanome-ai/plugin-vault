@@ -59,6 +59,40 @@ class RequestHandler(BaseHTTPRequestHandler):
         except:
             Logs.error('Error parsing path:\n', traceback.format_exc())
 
+    def _is_auth_valid(self, path):
+        if not VaultServer.enable_auth:
+            return True
+
+        auth = self.headers.get('authorization')
+        if auth is None:
+            return False
+
+        token = auth.split(' ')[-1]
+        cached = VaultServer.auth_cache.get(token, None)
+
+        if cached is None:
+            try:
+                headers = {'authorization': auth}
+                r = requests.get('https://api.nanome.ai/user/session', headers=headers, timeout=10)
+                r.raise_for_status()
+                if r.status_code == 200:
+                    json = r.json()
+                    cached = {'user': json['results']['user']['unique']}
+                    VaultServer.auth_cache[token] = cached
+            except:
+                return False
+
+        user = None
+        if cached:
+            user = cached['user']
+            cached['access'] = datetime.now()
+
+        search = re.search(r'^user-[0-9a-f]{8}', path)
+        if search is not None:
+            return user == search[0]
+
+        return user is not None
+
     # Utility function to set response header
     def _set_headers(self, code, type='text/html; charset=utf-8'):
         self.send_response(code)
@@ -119,6 +153,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         if path.startswith('/files'):
             path = path[7:]
 
+            if not self._is_auth_valid(path):
+                self._send_json(401, error='Unauthorized')
+                return
+
             key = self.headers.get('vault-key')
             if not VaultManager.is_key_valid(path, key):
                 self._send_json(403, error='Forbidden')
@@ -151,6 +189,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json(403, error='Forbidden')
             return
         path = path[7:]
+
+        if not self._is_auth_valid(path):
+            self._send_json(401, error='Unauthorized')
+            return
 
         try:
             form = cgi.FieldStorage(
@@ -272,6 +314,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     allow_reuse_address = True
+    daemon_threads = True
 
     def finish_request(self, request, client_address):
         request.settimeout(60)
@@ -279,11 +322,17 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 class VaultServer():
     is_running = False
+    last_auth_cleanup = None
+    last_file_cleanup = None
+
     converter_url = None
+    enable_auth = False
     keep_files_days = None
 
-    def __init__(self, port, ssl_cert, keep_files_days, converter_url):
-        self.__process = Process(target=VaultServer.start_process, args=(port, ssl_cert, keep_files_days, converter_url))
+    auth_cache = {}
+
+    def __init__(self, port, ssl_cert, keep_files_days, converter_url, enable_auth):
+        self.__process = Process(target=VaultServer.start_process, args=(port, ssl_cert, keep_files_days, converter_url, enable_auth))
 
     def start(self):
         self.__process.start()
@@ -297,9 +346,13 @@ class VaultServer():
         return ext in EXTENSIONS['supported'] + EXTENSIONS['converted']
 
     @classmethod
-    def start_process(cls, port, ssl_cert, keep_files_days, converter_url):
+    def start_process(cls, port, ssl_cert, keep_files_days, converter_url, enable_auth):
         VaultServer.is_running = True
+        VaultServer.last_auth_cleanup = datetime.now()
+        VaultServer.last_file_cleanup = datetime.now()
+
         VaultServer.converter_url = converter_url
+        VaultServer.enable_auth = enable_auth
         VaultServer.keep_files_days = keep_files_days
 
         server = ThreadedHTTPServer(('', port), RequestHandler)
@@ -308,10 +361,15 @@ class VaultServer():
             import ssl
             server.socket = ssl.wrap_socket(server.socket, certfile=ssl_cert, server_side=True)
 
-        cleanup_thread = None
+        auth_cleanup_thread = None
+        if VaultServer.enable_auth:
+            auth_cleanup_thread = Thread(target=VaultServer.auth_cleanup)
+            auth_cleanup_thread.start()
+
+        file_cleanup_thread = None
         if VaultServer.keep_files_days:
-            cleanup_thread = Thread(target=VaultServer.file_cleanup)
-            cleanup_thread.start()
+            file_cleanup_thread = Thread(target=VaultServer.file_cleanup)
+            file_cleanup_thread.start()
 
         try:
             server.serve_forever()
@@ -322,13 +380,42 @@ class VaultServer():
 
         VaultServer.is_running = False
 
-        if cleanup_thread:
-            cleanup_thread.join()
+        if auth_cleanup_thread:
+            auth_cleanup_thread.join()
+
+        if file_cleanup_thread:
+            file_cleanup_thread.join()
+
+    @staticmethod
+    def auth_cleanup():
+        while VaultServer.is_running:
+            sleep(1)
+            now = datetime.now()
+
+            # only run auth cleanup every 10 minutes
+            if now - VaultServer.last_auth_cleanup < timedelta(minutes=10):
+                continue
+
+            VaultServer.last_auth_cleanup = now
+            expiry_time = now - timedelta(hours=1)
+
+            # check token last accessed time and remove those older than 1 hour
+            for token in list(VaultServer.auth_cache):
+                if VaultServer.auth_cache[token]['access'] < expiry_time:
+                    del VaultServer.auth_cache[token]
 
     @staticmethod
     def file_cleanup():
         while VaultServer.is_running:
-            expiry_date = datetime.today() - timedelta(days=VaultServer.keep_files_days)
+            sleep(1)
+            now = datetime.now()
+
+            # only run file cleanup every 5 minutes
+            if now - VaultServer.last_file_cleanup < timedelta(minutes=5):
+                continue
+
+            VaultServer.last_file_cleanup = now
+            expiry_date = now - timedelta(days=VaultServer.keep_files_days)
 
             # check file last accessed time and remove those older than keep_files_days
             for root, _, files in os.walk(VaultManager.FILES_DIR):
@@ -338,6 +425,3 @@ class VaultServer():
 
                     if last_accessed < expiry_date:
                         os.remove(file_path)
-
-            # wait 5 minutes
-            sleep(300)

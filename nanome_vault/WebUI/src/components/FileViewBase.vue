@@ -18,15 +18,15 @@ export default {
     path: {
       handler: 'refresh',
       immediate: true
-    }
+    },
+    '$store.state.token': 'refresh'
   },
 
   mounted() {
     this.$root.$on('refresh', this.refresh)
-  },
-
-  destroyed() {
-    this.$root.$off('refresh', this.refresh)
+    this.$once('hook:beforeDestroy', () => {
+      this.$root.$off('refresh', this.refresh)
+    })
   },
 
   methods: {
@@ -42,12 +42,14 @@ export default {
         this.files = data.files
         this.loading = false
       } catch (e) {
+        if (e.code === 401) {
+          this.$store.commit('AUTH_ENABLED')
+          return
+        }
+
         if (e.code === 403) {
           const unlocked = await this.unlockFolder()
-          if (unlocked) {
-            this.refresh()
-            return
-          }
+          if (unlocked) return this.refresh()
         }
 
         this.$router.push('/')

@@ -9,7 +9,12 @@ function addSlash(path) {
   return path.replace(/\b$/, '/')
 }
 
-async function request(url, options) {
+async function request(url, options = {}) {
+  if (store.state.token && !url.startsWith(LOGIN_API)) {
+    options.headers = Object.assign({}, options.headers, {
+      Authorization: 'Bearer ' + store.state.token
+    })
+  }
   const res = await fetch(url, options)
   const json = await res.json()
   json.code = res.status
@@ -96,16 +101,20 @@ const API = {
       options.headers['Vault-Key'] = key
     }
 
+    if (store.state.token) {
+      options.headers['Authorization'] = 'Bearer ' + store.state.token
+    }
+
     const blob = await fetch('/files' + path, options).then(res => res.blob())
 
     const a = document.createElement('a')
-    const url = window.URL.createObjectURL(blob)
+    const url = URL.createObjectURL(blob)
     a.href = url
     a.download = path.substring(path.lastIndexOf('/') + 1)
     document.body.appendChild(a)
     a.click()
     a.remove()
-    window.URL.revokeObjectURL(url)
+    URL.revokeObjectURL(url)
   },
 
   list(path) {
