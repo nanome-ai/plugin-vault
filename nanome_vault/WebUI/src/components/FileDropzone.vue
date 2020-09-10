@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import { mapState } from 'vuex'
+import { mapGetters, mapState } from 'vuex'
 import API from '@/api'
 import { getFiles } from '@/helpers/files'
 
@@ -65,11 +65,8 @@ export default {
   }),
 
   computed: {
-    ...mapState(['extensions']),
-
-    allExtensions() {
-      return this.extensions.supported.concat(this.extensions.converted)
-    }
+    ...mapGetters(['allExtensions']),
+    ...mapState(['extensions'])
   },
 
   created() {

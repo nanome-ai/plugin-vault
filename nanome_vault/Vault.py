@@ -99,7 +99,7 @@ class Vault(nanome.PluginInstance):
             complex.name = item_name
             self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
 
-        elif extension in EXTENSIONS['supported']:
+        elif extension in EXTENSIONS['supported'] + EXTENSIONS['extras']:
             self.send_files_to_load(file_path, lambda _: callback())
 
         else:

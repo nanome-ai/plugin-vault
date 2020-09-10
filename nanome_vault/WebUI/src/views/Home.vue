@@ -23,8 +23,19 @@
     <template v-else>
       <p class="text-lg mb-8">
         Drag and drop or click the new file button to upload files.<br />
-        Supports <b>{{ extensions.supported | extensions }}</b>
+        Supports <b>{{ extensions.supported | extensions }},</b>
+        <button
+          v-if="!showMore"
+          class="ml-2 text-blue-500"
+          @click="showMore = true"
+        >
+          show more...
+        </button>
         <br />
+        <template v-if="showMore">
+          <b>{{ extensions.extras | extensions }}</b>
+          <br />
+        </template>
         Converts to PDF <b>{{ extensions.converted | extensions }}</b>
       </p>
 
@@ -54,6 +65,7 @@ import FileExplorer from '@/components/FileExplorer'
 
 export default {
   components: { FileExplorer },
+  data: () => ({ showMore: false }),
   computed: mapState(['authEnabled', 'token', 'name', 'extensions'])
 }
 </script>

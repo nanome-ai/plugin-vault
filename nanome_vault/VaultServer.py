@@ -45,6 +45,7 @@ POST_REQS = {
 
 EXTENSIONS = {
     'supported': ['pdb', 'sdf', 'cif', 'pdf', 'png', 'jpg', 'nanome', 'lua'],
+    'extras': ['ccp4', 'dcd', 'dsn6', 'dx', 'gro', 'mae', 'moe', 'mol2', 'pqr', 'pse', 'psf', 'smiles', 'trr', 'xtc', 'xyz'],
     'converted': ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp']
 }
 
@@ -343,7 +344,7 @@ class VaultServer():
     @staticmethod
     def file_filter(name):
         ext = name.split('.')[-1]
-        return ext in EXTENSIONS['supported'] + EXTENSIONS['converted']
+        return ext in sum(EXTENSIONS.values(), [])
 
     @classmethod
     def start_process(cls, port, ssl_cert, keep_files_days, converter_url, enable_auth):

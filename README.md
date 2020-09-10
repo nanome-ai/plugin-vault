@@ -10,8 +10,10 @@ Supports Nanome v1.16 and up. For previous versions, please check out [Vault v1.
 
 Vault natively supports:
 
-- Molecules: `.pdb` `.sdf` `.cif`
+- Molecules: `.cif` `.mol2` `.pdb` `.sdf` `.smiles` `.xyz`
+- 3rd party files: `.ccp4` `.dsn6` `.dx` `.mae` `.moe` `.pqr` `.pse` `.psf`
 - Documents: `.pdf`
+- Trajectories: `.dcd` `.gro` `.trr` `.xtc`
 - Images: `.png` `.jpg`
 - Workspaces: `.nanome`
 - Macros: `.lua`

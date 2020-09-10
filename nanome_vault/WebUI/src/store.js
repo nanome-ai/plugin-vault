@@ -11,8 +11,13 @@ const state = {
   name: null,
   extensions: {
     supported: [],
+    extras: [],
     converted: []
   }
+}
+
+const getters = {
+  allExtensions: ({ extensions }) => [].concat(...Object.values(extensions))
 }
 
 const mutations = {
@@ -78,6 +83,7 @@ const actions = {
 
 export default new Vuex.Store({
   state,
+  getters,
   mutations,
   actions
 })
