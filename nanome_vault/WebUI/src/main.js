@@ -10,10 +10,10 @@ import Modal from '@/components/Modal'
 Vue.config.productionTip = false
 
 Vue.directive('click-out', {
-  bind(el, binding, vnode) {
+  bind(el, binding) {
     el.data = {
       stop: e => e.stopPropagation(),
-      event: () => vnode.context[binding.expression](),
+      event: () => binding.value(),
       esc: e => e.key === 'Escape' && el.data.event()
     }
 
