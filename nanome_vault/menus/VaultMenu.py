@@ -73,7 +73,9 @@ class VaultMenu:
         self.ln_unlock_error = root.find_node('UnlockError')
 
         self.inp_unlock = root.find_node('UnlockInput').get_content()
+        self.inp_unlock.password = True
         self.inp_unlock.register_submitted_callback(self.open_locked_folder)
+
         self.btn_unlock_cancel = root.find_node('UnlockCancel').get_content()
         self.btn_unlock_cancel.register_pressed_callback(self.cancel_open_locked)
         self.btn_unlock_continue = root.find_node('UnlockContinue').get_content()
