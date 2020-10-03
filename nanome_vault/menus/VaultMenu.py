@@ -4,6 +4,7 @@ from functools import partial
 
 import nanome
 from nanome.util import Color
+from nanome.util.enums import ExportFormats
 
 from .. import VaultManager
 
@@ -115,11 +116,11 @@ class VaultMenu:
 
         self.ln_upload_complex_type = root.find_node('UploadComplexType')
         btn_pdb = root.find_node('PDB').get_content()
-        btn_pdb.register_pressed_callback(partial(self.upload_complex, 'pdb'))
+        btn_pdb.register_pressed_callback(partial(self.upload_complex, 'pdb', ExportFormats.PDB))
         btn_sdf = root.find_node('SDF').get_content()
-        btn_sdf.register_pressed_callback(partial(self.upload_complex, 'sdf'))
+        btn_sdf.register_pressed_callback(partial(self.upload_complex, 'sdf', ExportFormats.SDF))
         btn_mmcif = root.find_node('MMCIF').get_content()
-        btn_mmcif.register_pressed_callback(partial(self.upload_complex, 'cif'))
+        btn_mmcif.register_pressed_callback(partial(self.upload_complex, 'cif', ExportFormats.MMCIF))
 
         self.ln_upload_confirm = root.find_node('UploadConfirm')
         self.lbl_upload_confirm = root.find_node('UploadConfirmLabel').get_content()
@@ -347,18 +348,18 @@ class VaultMenu:
         if not name:
             return
 
-        def on_workspace(workspace):
-            self.upload_item = workspace
+        def on_export(results):
+            self.upload_item = results[0]
             self.upload_name = name
             self.upload_ext = 'nanome'
             self.ln_upload_workspace.enabled = False
             self.show_upload_confirm()
 
-        self.plugin.request_workspace(on_workspace)
+        self.plugin.request_export(ExportFormats.Nanome, on_export)
 
     def show_upload_macro(self):
         def select_macro(button):
-            self.upload_item = button.macro
+            self.upload_item = button.macro.logic
             self.upload_name = button.macro.title
             self.upload_ext = 'lua'
             self.lst_upload.parent.enabled = False
@@ -409,16 +410,15 @@ class VaultMenu:
 
         self.plugin.request_complex_list(on_complex_list)
 
-    def upload_complex(self, extension, button):
-        def on_complexes(complexes):
-            complex = complexes[0]
-            self.upload_item = complex
-            self.upload_name = complex.name
+    def upload_complex(self, extension, format, button):
+        def on_export(results):
+            self.upload_name = self.upload_item.name
+            self.upload_item = results[0]
             self.upload_ext = extension
             self.ln_upload_complex_type.enabled = False
             self.show_upload_confirm()
 
-        self.plugin.request_complexes([self.upload_item.index], on_complexes)
+        self.plugin.request_export(format, on_export, [self.upload_item.index])
 
     def show_upload_message(self, message=None):
         self.ln_upload_message.enabled = True

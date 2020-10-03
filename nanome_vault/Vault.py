@@ -69,9 +69,7 @@ class Vault(nanome.PluginInstance):
                     self.update_workspace(workspace)
                 msg = f'Workspace "{item_name}" loaded'
             except:
-                Logs.warning('Workspace not saved with Vault, sending binary to Nanome:\n  ' + file_path)
-                # TODO: remove when callback on send_files_to_load .nanome works
-                self.send_files_to_load(file_path, lambda _: None)
+                self.send_files_to_load(file_path)
             finally:
                 callback()
 
@@ -84,20 +82,6 @@ class Vault(nanome.PluginInstance):
                 macro.save()
             msg = f'Macro "{item_name}" added'
             callback()
-
-        # structure
-        elif extension == 'pdb':
-            complex = Complex.io.from_pdb(path=file_path)
-            complex.name = item_name
-            self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
-        elif extension == 'sdf':
-            complex = Complex.io.from_sdf(path=file_path)
-            complex.name = item_name
-            self.bonds_ready([complex], callback)
-        elif extension == 'cif':
-            complex = Complex.io.from_mmcif(path=file_path)
-            complex.name = item_name
-            self.add_bonds([complex], partial(self.bonds_ready, callback=callback))
 
         elif extension in EXTENSIONS['supported'] + EXTENSIONS['extras']:
             self.send_files_to_load(file_path, lambda _: callback())
@@ -117,23 +101,11 @@ class Vault(nanome.PluginInstance):
     def save_file(self, item, name, extension):
         temp = tempfile.NamedTemporaryFile(delete=False, suffix=extension)
 
-        # workspace
-        if extension == 'nanome':
-            with open(temp.name, 'wb') as f:
-                f.write(Workspace.to_data(item))
-
-        # macro
-        elif extension == 'lua':
-            with open(temp.name, 'wb') as f:
-                f.write(item.logic.encode('utf-8'))
-
-        # structures
-        elif extension == 'pdb':
-            item.io.to_pdb(temp.name)
-        elif extension == 'sdf':
-            item.io.to_sdf(temp.name)
-        elif extension == 'cif':
-            item.io.to_mmcif(temp.name)
+        # structures / workspace
+        if extension in ['pdb', 'sdf', 'cif', 'lua', 'nanome']:
+            mode = 'wb' if extension == 'nanome' else 'w'
+            with open(temp.name, mode) as f:
+                f.write(item)
 
         with open(temp.name, 'rb') as f:
             path = VaultManager.get_vault_path(self.menu.path)
@@ -145,9 +117,6 @@ class Vault(nanome.PluginInstance):
 
         temp.close() # unsure if needed
         os.remove(temp.name)
-
-    def bonds_ready(self, complexes, callback):
-        self.add_dssp(complexes, partial(self.send_complexes, callback=callback))
 
     def send_complexes(self, complexes, callback):
         self.add_to_workspace(complexes)
