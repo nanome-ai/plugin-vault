@@ -59,9 +59,9 @@ and add `-c http://localhost:3000` as an argument when you start the plugin.
 
   Enables enforced authentication, preventing users from accessing files in the Web UI unless they are logged in.
 
-- `-k days` or `--keep-files-days days`
+- `--keep-files-days days`
 
-  Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `-k 14`
+  Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `--keep-files-days 14`
 
 - `-s certfile` or `--ssl-cert certfile`
 

@@ -156,7 +156,7 @@ def main():
                 converter_url = sys.argv[i + 1]
             elif arg in ['--enable-auth']:
                 enable_auth = True
-            elif arg in ['-k', '--keep-files-days']:
+            elif arg in ['--keep-files-days']:
                 keep_files_days = int(sys.argv[i + 1])
             elif arg in ['-s', '--ssl-cert']:
                 ssl_cert = sys.argv[i + 1]
