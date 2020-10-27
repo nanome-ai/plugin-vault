@@ -18,7 +18,7 @@ if [ "$(docker ps -qf name=vault-converter)" == "" ]; then
     --env DISABLE_GOOGLE_CHROME=1 \
     --env MAXIMUM_WAIT_TIMEOUT=60 \
     --env DEFAULT_WAIT_TIMEOUT=60 \
-    thecodingmachine/gotenberg:6
+    thecodingmachine/gotenberg:6 2>&1
 fi
 
 PORT=80
