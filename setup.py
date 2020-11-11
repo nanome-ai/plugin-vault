@@ -6,7 +6,7 @@ README = (pathlib.Path(__file__).parent / "README.md").read_text()
 setup(
 	name = 'nanome-vault',
 	packages=find_packages(),
-	version = '2.2.0',
+	version = '2.2.1',
 	license='MIT',
 	description = 'A Nanome plugin that creates a web interface to upload files and make them available in Nanome',
 	long_description = README,
