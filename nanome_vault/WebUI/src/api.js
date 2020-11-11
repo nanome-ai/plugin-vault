@@ -105,6 +105,7 @@ const API = {
       options.headers['Authorization'] = 'Bearer ' + store.state.token
     }
 
+    path = replaceAccount(path)
     const blob = await fetch('/files' + path, options).then(res => res.blob())
 
     const a = document.createElement('a')
