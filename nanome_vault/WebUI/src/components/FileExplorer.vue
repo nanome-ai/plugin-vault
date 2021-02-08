@@ -107,9 +107,11 @@ export default {
       const { component, path, locked, encrypted, key_path } = this.contextmenu
 
       const isFolder = path.slice(-1) === '/'
+      const inAccount = path.slice(0, 8) === '/account'
       const canCreate = !component || (isFolder && !locked)
       const canModify = component && !['/shared/', '/account/'].includes(path)
-      const canEncrypt = !encrypted && !key_path && isFolder && canModify
+      const canEncrypt =
+        !encrypted && !key_path && isFolder && canModify && !inAccount
 
       return {
         isFolder,
