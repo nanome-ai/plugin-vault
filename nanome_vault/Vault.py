@@ -17,9 +17,15 @@ DEFAULT_WEB_PORT = 80
 DEFAULT_CONVERTER_URL = 'http://vault-converter:3000'
 DEFAULT_KEEP_FILES_DAYS = 0
 
+EXPORT_LOCATIONS = ['Structures', 'Workspaces', 'Recordings']
+
 # Plugin instance (for Nanome)
 class Vault(nanome.PluginInstance):
     def start(self):
+        self.integration.import_file = lambda _: self.on_run()
+        self.integration.export_locations = lambda req: req.send_response(EXPORT_LOCATIONS)
+        self.integration.export_file = self.on_export_file
+
         self.set_plugin_list_button(self.PluginListButtonType.run, 'Open')
 
         # set to empty string to read/write macros in Macros folder
@@ -36,6 +42,11 @@ class Vault(nanome.PluginInstance):
 
     def on_presenter_change(self):
         self.request_presenter_info(self.update_account)
+
+    def on_export_file(self, request):
+        (location, filename, data) = request.get_args()
+        path = os.path.join(self.account, location)
+        VaultManager.add_file(path, filename, data)
 
     def update_account(self, info):
         if not info.account_id:
@@ -179,7 +190,7 @@ def main():
         server.stop()
 
     # Plugin
-    plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False)
+    plugin = nanome.Plugin('-TEST- Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False)
     plugin.set_plugin_class(Vault)
     plugin.set_custom_data(url, port)
     plugin.pre_run = pre_run
