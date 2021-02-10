@@ -190,7 +190,7 @@ def main():
         server.stop()
 
     # Plugin
-    plugin = nanome.Plugin('-TEST- Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False)
+    plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False)
     plugin.set_plugin_class(Vault)
     plugin.set_custom_data(url, port)
     plugin.pre_run = pre_run
