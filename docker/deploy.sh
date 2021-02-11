@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "./deploy.sh $*" > redeploy.sh
+chmod +x redeploy.sh
+
 if [ "$(docker ps -aq -f name=vault)" != "" ]; then
     echo "removing exited container"
     docker rm -f vault

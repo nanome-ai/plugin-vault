@@ -4,5 +4,6 @@ node_modules
 /build
 /dist
 /docker/.cachebust
+/docker/redeploy.sh
 *.egg-info
 *.log
