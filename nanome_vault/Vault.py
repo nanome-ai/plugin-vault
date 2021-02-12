@@ -17,7 +17,7 @@ DEFAULT_WEB_PORT = 80
 DEFAULT_CONVERTER_URL = 'http://vault-converter:3000'
 DEFAULT_KEEP_FILES_DAYS = 0
 
-EXPORT_LOCATIONS = ['Structures', 'Workspaces', 'Recordings']
+EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures']
 
 # Plugin instance (for Nanome)
 class Vault(nanome.PluginInstance):
