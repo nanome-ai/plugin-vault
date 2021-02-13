@@ -27,6 +27,8 @@ Using [Gotenberg](https://github.com/thecodingmachine/gotenberg), the following 
 
 It is highly recommended to run Vault in Docker.
 
+*If you plan to use SSL authentication, add the .pem file to the current directory before Docker Build
+
 #### Docker Usage
 
 To run with Docker including Gotenberg:
