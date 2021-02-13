@@ -29,6 +29,9 @@ It is highly recommended to run Vault in Docker.
 
 *If you plan to use SSL authentication, add the .pem file to the current directory before Docker Build
 
+To generate a self signed certificate to use for local HTTPS:\
+  `openssl req -new -x509 -keyout cert.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'`
+
 #### Docker Usage
 
 To run with Docker including Gotenberg:
@@ -56,9 +59,6 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 - `-s certfile` or `--ssl-cert certfile`
 
   SSL certificate to be used for HTTPS. If port is not set, port will default to 443. Example: `-s ./cert.pem`
-
-  To generate a self signed certificate to use for local HTTPS:\
-  `openssl req -new -x509 -keyout cert.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'`
 
 - `-u url` or `--url url`
 
