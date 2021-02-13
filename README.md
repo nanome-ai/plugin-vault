@@ -25,29 +25,17 @@ Using [Gotenberg](https://github.com/thecodingmachine/gotenberg), the following 
 
 ### Installation
 
-It is highly recommended to run Vault in Docker; please see the Docker Usage section.
+It is highly recommended to run Vault in Docker.
+
+#### Docker Usage
+
+To run with Docker including Gotenberg:
 
 ```sh
-$ pip3 install nanome-vault --upgrade
+$ cd docker
+$ ./build.sh
+$ ./deploy.sh -a <plugin_server_address> [optional args]
 ```
-
-### Usage
-
-To start the plugin:
-
-```sh
-$ nanome-vault -a <plugin_server_address> [optional args]
-```
-
-On Linux, you might have to start using `sudo nanome-vault` to listen on port 80.
-
-To utilize file conversion (to support files like `.ppt` and `.doc`), launch Gotenberg:
-
-```sh
-$ docker run --rm -p 3000:3000 thecodingmachine/gotenberg:6
-```
-
-and add `-c http://localhost:3000` as an argument when you start the plugin.
 
 #### Optional arguments:
 
@@ -86,15 +74,31 @@ In Nanome:
 - Click Run
 - Open your web browser, go to "127.0.0.1" (or your computer's IP address from another computer), and add supported files. Your files will appear in Nanome.
 
-### Docker Usage
 
-To run with Docker including Gotenberg:
+
+### Running as Python Script
+```sh
+$ pip3 install nanome-vault --upgrade
+```
+
+### Usage
+
+To start the plugin:
 
 ```sh
-$ cd docker
-$ ./build.sh
-$ ./deploy.sh -a <plugin_server_address> [optional args]
+$ nanome-vault -a <plugin_server_address> [optional args]
 ```
+
+On Linux, you might have to start using `sudo nanome-vault` to listen on port 80.
+
+To utilize file conversion (to support files like `.ppt` and `.doc`), launch Gotenberg:
+
+```sh
+$ docker run --rm -p 3000:3000 thecodingmachine/gotenberg:6
+```
+
+and add `-c http://localhost:3000` as an argument when you start the plugin.
+
 
 ### Development
 
