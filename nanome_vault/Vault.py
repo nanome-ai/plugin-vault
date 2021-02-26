@@ -33,7 +33,6 @@ class Vault(nanome.PluginInstance):
 
         self.account = 'user-00000000'
         self.menu = VaultMenu(self, self.get_server_url())
-        self.on_run()
 
     def on_run(self):
         self.on_presenter_change()
