@@ -44,7 +44,7 @@ POST_REQS = {
 }
 
 EXTENSIONS = {
-    'supported': ['pdb', 'sdf', 'cif', 'pdf', 'png', 'jpg', 'nanome', 'lua'],
+    'supported': ['pdb', 'sdf', 'cif', 'pdf', 'png', 'jpg', 'nanome', 'nanosr', 'lua'],
     'extras': ['ccp4', 'dcd', 'dsn6', 'dx', 'gro', 'mae', 'moe', 'mol2', 'pqr', 'pse', 'psf', 'smiles', 'trr', 'xtc', 'xyz'],
     'converted': ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp']
 }
