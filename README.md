@@ -15,6 +15,7 @@ Vault natively supports:
 - Documents: `.pdf`
 - Trajectories: `.dcd` `.gro` `.trr` `.xtc`
 - Images: `.png` `.jpg`
+- Spatial Recordings: `.nanosr`
 - Workspaces: `.nanome`
 - Macros: `.lua`
 
