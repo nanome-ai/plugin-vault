@@ -20,6 +20,7 @@ class VaultMenu:
         self.address = address
         self.path = '.'
         self.showing_upload = False
+        self.selected_items = []
         self.create_menu()
 
     def create_menu(self):
@@ -27,11 +28,6 @@ class VaultMenu:
         root = self.menu.root
 
         self.pfb_list_item = nanome.ui.LayoutNode.io.from_json(LIST_ITEM_PATH)
-        btn = self.pfb_list_item.find_node('ButtonNode').get_content()
-        btn.outline.active = False
-        btn.mesh.active = True
-        btn.mesh.enabled.idle = False
-        btn.mesh.color.highlighted = Color(whole_num=0x2fdbbfff)
 
         # outer wrapper components
         def open_url(button):
@@ -53,6 +49,10 @@ class VaultMenu:
 
         self.btn_upload = root.find_node('UploadButton').get_content()
         self.btn_upload.register_pressed_callback(self.toggle_upload)
+
+        self.btn_load = root.find_node('LoadButton').get_content()
+        self.btn_load.register_pressed_callback(self.load_files)
+        self.btn_load.disable_on_press = True
 
         lbl_instr = root.find_node('InstructionLabel').get_content()
         lbl_instr.text_value = f'Visit {self.address} in browser to add files'
@@ -137,6 +137,7 @@ class VaultMenu:
         self.update()
 
     def update(self):
+        self.selected_items = []
         items = VaultManager.list_path(self.path)
         at_root = self.path == '.'
 
@@ -149,6 +150,7 @@ class VaultMenu:
             self.plugin.update_content(self.btn_upload)
 
         self.update_crumbs()
+        self.update_load_button()
         self.update_explorer(items)
 
     def update_crumbs(self):
@@ -200,6 +202,14 @@ class VaultMenu:
         if changed or not len(old_items):
             self.plugin.update_content(self.lst_files)
 
+    def update_load_button(self):
+        n = len(self.selected_items)
+        items_text = f' {n} item{"s" if n > 1 else ""}' if n > 0 else ''
+
+        self.btn_load.unusable = n == 0
+        self.btn_load.text.value.set_all('Load' + items_text)
+        self.plugin.update_content(self.btn_load)
+
     def add_item(self, name, is_folder, index=None):
         new_item = self.pfb_list_item.clone()
         new_item.name = name
@@ -220,17 +230,15 @@ class VaultMenu:
             btn.icon.size = 0.5
             btn.icon.position.x = 0.9
 
-        def on_load():
-            self.lst_files.parent.enabled = True
-            self.lbl_loading.parent.enabled = False
-            self.plugin.update_menu(self.menu)
-
         def on_file_pressed(button):
-            self.lst_files.parent.enabled = False
-            self.lbl_loading.parent.enabled = True
-            self.lbl_loading.text_value = 'loading...\n' + button.item_name
-            self.plugin.update_menu(self.menu)
-            self.plugin.load_file(button.item_name, on_load)
+            button.selected = not button.selected
+            if button.selected:
+                self.selected_items.append(button)
+            else:
+                self.selected_items.remove(button)
+
+            self.update_load_button()
+            self.plugin.update_content(button)
 
         def on_folder_pressed(button):
             self.open_folder(button.item_name)
@@ -287,6 +295,32 @@ class VaultMenu:
         self.ln_explorer.enabled = True
         self.ln_unlock.enabled = False
         self.plugin.update_menu(self.menu)
+
+    def load_files(self, button=None):
+        if not self.selected_items:
+            return
+
+        def on_load():
+            self.selected_items = []
+            self.lst_files.parent.enabled = True
+            self.lbl_loading.parent.enabled = False
+            self.update_load_button()
+            self.plugin.update_menu(self.menu)
+
+        def callback():
+            nonlocal n
+            if n > 1: n -= 1
+            else: on_load()
+
+        n = len(self.selected_items)
+        self.lst_files.parent.enabled = False
+        self.lbl_loading.parent.enabled = True
+        self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
+        self.plugin.update_menu(self.menu)
+
+        for btn in self.selected_items:
+            self.plugin.load_file(btn.item_name, callback)
+            btn.selected = False
 
     def toggle_upload(self, button=None, show=None):
         show = not self.showing_upload if show is None else show

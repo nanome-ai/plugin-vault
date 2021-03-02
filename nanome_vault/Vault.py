@@ -194,7 +194,7 @@ def main():
     plugin.set_custom_data(url, port)
     plugin.pre_run = pre_run
     plugin.post_run = post_run
-    plugin.run('127.0.0.1', 8888)
+    plugin.run()
 
 if __name__ == '__main__':
     main()
