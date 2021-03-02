@@ -24,11 +24,18 @@ if [ "$(docker ps -qf name=vault-converter)" == "" ]; then
     thecodingmachine/gotenberg:6 2>&1
 fi
 
-PORT=80
+DEFAULT_PORT=80
+PORT=
 ARGS=$*
 
 while [ "$1" != "" ]; do
     case $1 in
+        -s | --ssl-cert )
+            if [ -z "$PORT" ]; then
+                PORT=443
+            fi
+            shift
+            ;;
         -w | --web-port )
             shift
             PORT=$1
@@ -36,6 +43,10 @@ while [ "$1" != "" ]; do
     esac
     shift
 done
+
+if [ -z "$PORT" ]; then
+    PORT=$DEFAULT_PORT
+fi
 
 docker run -d \
 --name vault \
