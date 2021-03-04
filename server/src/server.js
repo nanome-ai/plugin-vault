@@ -5,6 +5,7 @@ const http = require('http')
 const fs = require('fs')
 const app = require('./app')
 const config = require('./config')
+const cron = require('./services/cron')
 
 const args = process.argv.slice(2)
 while (args.length) {
@@ -27,4 +28,4 @@ const options = {
 https.createServer(options, app).listen(443)
 http.createServer(app).listen(80)
 
-// TODO: cron services (auth and file cleanup)
+cron.init()

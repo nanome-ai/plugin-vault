@@ -23,6 +23,8 @@ exports.EXTENSIONS = {
   converted: ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp']
 }
 
+exports.FILES_DIR = FILES_DIR
+
 // add data to vault at path/filename, where filename can contain a path
 exports.addFile = (path, filename, data, key) => {
   path = exports.getVaultPath(path, false)
