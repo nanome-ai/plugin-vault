@@ -13,46 +13,58 @@ router.get('/info', (req, res) => {
   res.success({ extensions: Vault.EXTENSIONS })
 })
 
-router.use('/files', auth, (req, res) => {
-  let path = decodeURI(req.path).slice(1)
+router.get('/files(/*)?', auth, (req, res) => {
+  let path = decodeURI(req.path).slice(7)
 
-  if (req.method === 'GET') {
-    const key = req.headers['vault-key']
-    if (!Vault.isKeyValid(path, key)) {
-      throw HTTPError.FORBIDDEN
-    }
-
-    const isFile = /\.[^/]+$/.test(path)
-    if (!isFile) {
-      const result = Vault.listPath(path)
-      return res.success(result)
-    }
-
-    const data = Vault.getFile(path, key)
-    return res.send(data)
+  const key = req.headers['vault-key']
+  if (!Vault.isKeyValid(path, key)) {
+    throw HTTPError.FORBIDDEN
   }
 
-  if (req.method === 'POST') {
-    const { command, name, key } = req.fields
-    // TODO: validate args
+  const isFile = /\.[^/]+$/.test(path)
+  if (!isFile) {
+    const result = Vault.listPath(path)
+    return res.success(result)
+  }
 
-    const needsKey = ['create', 'delete', 'rename', 'upload'].includes(command)
-    if (needsKey && !Vault.isKeyValid(path, key)) throw HTTPError.FORBIDDEN
+  const data = Vault.getFile(path, key)
+  return res.send(data)
+})
 
-    if (command === 'create') {
+router.post('/files(/*)?', auth, (req, res) => {
+  let path = decodeURI(req.path).slice(7)
+  const { command, name, key } = req.fields
+
+  const needsKey = ['create', 'delete', 'rename', 'upload'].includes(command)
+  if (needsKey && !Vault.isKeyValid(path, key)) throw HTTPError.FORBIDDEN
+
+  if (!key && ['decrypt', 'encrypt', 'verify'].includes(command)) {
+    throw new HTTPError(400, 'Missing arg: "key"')
+  }
+
+  switch (command) {
+    case 'create':
       Vault.createPath(path)
-    } else if (command === 'delete') {
-      Vault.deletePath(path)
-    } else if (command === 'rename') {
-      Vault.renamePath(path, name)
-    } else if (command === 'encrypt') {
-      Vault.encryptFolder(path, key)
-    } else if (command === 'decrypt') {
+      break
+
+    case 'decrypt':
       Vault.decryptFolder(path, key)
-    } else if (command === 'verify') {
-      const success = Vault.isKeyValid(path, key)
-      return res.success({ success })
-    } else if (command === 'upload') {
+      break
+
+    case 'delete':
+      Vault.deletePath(path)
+      break
+
+    case 'encrypt':
+      Vault.encryptFolder(path, key)
+      break
+
+    case 'rename':
+      if (!name) throw new HTTPError(400, 'Missing arg: "name"')
+      Vault.renamePath(path, name)
+      break
+
+    case 'upload':
       let { files } = req.files
       if (!Array.isArray(files)) files = [files]
 
@@ -78,12 +90,16 @@ router.use('/files', auth, (req, res) => {
 
       const result = failed.length ? { failed } : {}
       return res.success(result)
-    } else {
-      throw new HTTPError(400, 'Invalid command')
-    }
 
-    res.success()
+    case 'verify':
+      const success = Vault.isKeyValid(path, key)
+      return res.success({ success })
+
+    default:
+      throw new HTTPError(400, 'Invalid command')
   }
+
+  res.success()
 })
 
 router.use(express.static(STATIC_DIR))
