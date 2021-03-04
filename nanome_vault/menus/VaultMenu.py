@@ -273,7 +273,7 @@ class VaultMenu:
 
         self.path = os.path.normpath(os.path.join(self.path, folder))
         if sys.platform.startswith('win32'):
-            self.path = self.path.replace('\\', ' / ')
+            self.path = self.path.replace('\\', '/')
         if self.path[:2] == '..':
             self.path = '.'
 
