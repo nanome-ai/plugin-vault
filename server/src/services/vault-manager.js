@@ -57,35 +57,6 @@ exports.createPath = path => {
   fs.mkdirSync(path, { recursive: true })
 }
 
-// encrypts data with key and writes result to outPath, or returns if no outPath
-exports.encryptData = (data, key, outPath) => {
-  const enc = aes.encrypt(data, key)
-  if (!outPath) return enc
-  fs.writeFileSync(outPath, enc)
-}
-
-// encrypts full contents of path or throws if encrypted subfolder exists
-exports.encryptFolder = (path, key) => {
-  path = exports.getVaultPath(path)
-
-  // check if subfolder already encrypted
-  if (walk.walkSync(path).find(f => f.name === '.locked')) {
-    throw new HTTPError(400, 'Path already encrypted')
-  }
-
-  // encrypt all files not starting with '.'
-  const files = walk.walkSync(path, WALK_SETTINGS)
-  for (const file of files) {
-    const data = fs.readFileSync(file.path)
-    exports.encryptData(data, key, file.path)
-  }
-
-  // add lock file for key verification
-  const lock = ospath.join(path, '.locked')
-  const data = aes.encrypt(LOCK_TEXT, key)
-  fs.writeFileSync(lock, data)
-}
-
 // decrypts data with key and writes result to outPath, or returns if no outPath
 exports.decryptData = (data, key, outPath) => {
   const dec = aes.decrypt(data, key)
@@ -124,6 +95,35 @@ exports.deletePath = path => {
 
   path = exports.getVaultPath(path)
   fs.removeSync(path)
+}
+
+// encrypts data with key and writes result to outPath, or returns if no outPath
+exports.encryptData = (data, key, outPath) => {
+  const enc = aes.encrypt(data, key)
+  if (!outPath) return enc
+  fs.writeFileSync(outPath, enc)
+}
+
+// encrypts full contents of path or throws if encrypted subfolder exists
+exports.encryptFolder = (path, key) => {
+  path = exports.getVaultPath(path)
+
+  // check if subfolder already encrypted
+  if (walk.walkSync(path).find(f => f.name === '.locked')) {
+    throw new HTTPError(400, 'Path already encrypted')
+  }
+
+  // encrypt all files not starting with '.'
+  const files = walk.walkSync(path, WALK_SETTINGS)
+  for (const file of files) {
+    const data = fs.readFileSync(file.path)
+    exports.encryptData(data, key, file.path)
+  }
+
+  // add lock file for key verification
+  const lock = ospath.join(path, '.locked')
+  const data = aes.encrypt(LOCK_TEXT, key)
+  fs.writeFileSync(lock, data)
 }
 
 // returns file data of path, decrypted with key if exists
