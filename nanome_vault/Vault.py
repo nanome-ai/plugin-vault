@@ -9,14 +9,10 @@ from nanome.util import Logs
 from nanome.util.enums import NotificationTypes
 from nanome.api.structure import Complex
 
-from .VaultServer import VaultServer, EXTENSIONS
 from .menus import VaultMenu
 from . import VaultManager, Workspace
 
 DEFAULT_WEB_PORT = 80
-DEFAULT_CONVERTER_URL = 'http://vault-converter:3000'
-DEFAULT_KEEP_FILES_DAYS = 0
-
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures']
 
 # Plugin instance (for Nanome)
@@ -33,6 +29,7 @@ class Vault(nanome.PluginInstance):
 
         self.account = 'user-00000000'
         self.menu = VaultMenu(self, self.get_server_url())
+        self.extensions = VaultManager.get_extensions()
 
     def on_run(self):
         self.on_presenter_change()
@@ -58,16 +55,12 @@ class Vault(nanome.PluginInstance):
     def load_file(self, name, callback):
         item_name, extension = name.rsplit('.', 1)
 
-        path = self.menu.path
-        file_path = VaultManager.get_vault_path(os.path.join(path, name))
+        path = os.path.join(self.menu.path, name)
+        key = self.menu.folder_key
 
-        temp = None
-        if self.menu.locked_path:
-            key = self.menu.folder_key
-            temp = tempfile.TemporaryDirectory()
-            temp_path = os.path.join(temp.name, name)
-            VaultManager.decrypt_file(file_path, key, temp_path)
-            file_path = temp_path
+        temp = tempfile.TemporaryDirectory()
+        file_path = os.path.join(temp.name, name)
+        VaultManager.get_file(path, key, file_path)
 
         msg = None
 
@@ -93,7 +86,7 @@ class Vault(nanome.PluginInstance):
             msg = f'Macro "{item_name}" added'
             callback()
 
-        elif extension in EXTENSIONS['supported'] + EXTENSIONS['extras']:
+        elif extension in self.extensions['supported'] + self.extensions['extras']:
             self.send_files_to_load(file_path, lambda _: callback())
 
         else:
@@ -105,8 +98,7 @@ class Vault(nanome.PluginInstance):
         if msg is not None:
             self.send_notification(NotificationTypes.success, msg)
 
-        if temp:
-            temp.cleanup()
+        temp.cleanup()
 
     def save_file(self, item, name, extension):
         temp = tempfile.NamedTemporaryFile(delete=False, suffix=extension)
@@ -118,7 +110,7 @@ class Vault(nanome.PluginInstance):
                 f.write(item)
 
         with open(temp.name, 'rb') as f:
-            path = VaultManager.get_vault_path(self.menu.path)
+            path = self.menu.path
             key = self.menu.folder_key
             file_name = f'{name}.{extension}'
 
@@ -153,23 +145,14 @@ class Vault(nanome.PluginInstance):
 
 def main():
     # Plugin server (for Web)
-    converter_url = DEFAULT_CONVERTER_URL
-    enable_auth = False
-    keep_files_days = DEFAULT_KEEP_FILES_DAYS
-    ssl_cert = None
+    https = False
     url = None
-    port = DEFAULT_WEB_PORT
+    port = None
 
     try:
         for i, arg in enumerate(sys.argv):
-            if arg in ['-c', '--converter-url']:
-                converter_url = sys.argv[i + 1]
-            elif arg in ['--enable-auth']:
-                enable_auth = True
-            elif arg in ['--keep-files-days']:
-                keep_files_days = int(sys.argv[i + 1])
-            elif arg in ['-s', '--ssl-cert']:
-                ssl_cert = sys.argv[i + 1]
+            if arg in ['--https', '-s', '--ssl-cert']:
+                https = True
             elif arg in ['-u', '--url']:
                 url = sys.argv[i + 1]
             elif arg in ['-w', '--web-port']:
@@ -177,23 +160,13 @@ def main():
     except:
         pass
 
-    if ssl_cert is not None and port == DEFAULT_WEB_PORT:
-        port = 443
-
-    server = None
-    def pre_run():
-        nonlocal server
-        server = VaultServer(port, ssl_cert, keep_files_days, converter_url, enable_auth)
-        server.start()
-    def post_run():
-        server.stop()
+    if port is None:
+        port = 443 if https else DEFAULT_WEB_PORT
 
     # Plugin
     plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False)
     plugin.set_plugin_class(Vault)
     plugin.set_custom_data(url, port)
-    plugin.pre_run = pre_run
-    plugin.post_run = post_run
     plugin.run()
 
 if __name__ == '__main__':

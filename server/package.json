@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "NODE_ENV=dev nodemon src/server.js",
-    "start": "pm2-runtime start src/server.js"
+    "start": "pm2-runtime start src/server.js --"
   },
   "dependencies": {
     "@nodelib/fs.walk": "^1.2.6",

@@ -138,7 +138,7 @@ class VaultMenu:
 
     def update(self):
         self.selected_items = []
-        items = VaultManager.list_path(self.path)
+        items = VaultManager.list_path(self.path, self.folder_key)
         at_root = self.path == '.'
 
         if at_root:
@@ -273,8 +273,8 @@ class VaultMenu:
 
         self.path = os.path.normpath(os.path.join(self.path, folder))
         if sys.platform.startswith('win32'):
-            self.path = self.path.replace('\\', '/')
-        if not VaultManager.is_safe_path(self.path):
+            self.path = self.path.replace('\\', ' / ')
+        if self.path[:2] == '..':
             self.path = '.'
 
         self.update()

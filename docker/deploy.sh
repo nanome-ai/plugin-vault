@@ -8,6 +8,11 @@ if [ "$(docker ps -aq -f name=vault)" != "" ]; then
     docker rm -f vault
 fi
 
+if [ "$(docker ps -aq -f name=vault-server)" != "" ]; then
+    echo "removing exited container"
+    docker rm -f vault-server
+fi
+
 if [ "$(docker network ls -qf name=vault-network)" == "" ]; then
     echo "creating network"
     docker network create --driver bridge vault-network
@@ -25,16 +30,17 @@ if [ "$(docker ps -qf name=vault-converter)" == "" ]; then
 fi
 
 DEFAULT_PORT=80
+SERVER_PORT=80
 PORT=
 ARGS=$*
 
 while [ "$1" != "" ]; do
     case $1 in
-        -s | --ssl-cert )
+        --https | -s | --ssl-cert )
             if [ -z "$PORT" ]; then
                 PORT=443
             fi
-            shift
+            SERVER_PORT=443
             ;;
         -w | --web-port )
             shift
@@ -52,7 +58,14 @@ docker run -d \
 --name vault \
 --restart unless-stopped \
 --network vault-network \
--p $PORT:$PORT \
+-e ARGS="$ARGS" \
+vault
+
+docker run -d \
+--name vault-server \
+--restart unless-stopped \
+--network vault-network \
+-p $PORT:$SERVER_PORT \
 -e ARGS="$ARGS" \
 -v vault-volume:/root \
-vault
+vault-server

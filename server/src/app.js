@@ -22,6 +22,7 @@ express.response.error = function (error, statusCode) {
   })
 }
 
+app.use(require('morgan')('dev')) // logging
 app.use(require('helmet')())
 app.use(require('compression')())
 app.use(formidable({ multiples: true }))
