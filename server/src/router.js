@@ -80,8 +80,8 @@ router.post(
           .map(f => f.name)
           .filter(f => {
             const ext = f.split('.').pop()
-            const extensions = [].concat(Object.values(Vault.EXTENSIONS))
-            return extensions.includes(ext)
+            const extensions = [].concat(...Object.values(Vault.EXTENSIONS))
+            return !extensions.includes(ext)
           })
 
         if (unsupported.length) {
