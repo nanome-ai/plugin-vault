@@ -23,7 +23,7 @@ express.response.error = function (error, statusCode) {
 }
 
 app.use(require('morgan')('dev')) // logging
-app.use(require('helmet')())
+app.use(require('helmet')({ contentSecurityPolicy: false }))
 app.use(require('compression')())
 app.use(formidable({ multiples: true }))
 app.use(require('./router'))
