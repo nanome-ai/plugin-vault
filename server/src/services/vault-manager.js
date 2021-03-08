@@ -38,7 +38,7 @@ exports.addFile = (path, filename, data, key) => {
   fs.ensureDirSync(subFolder)
 
   // rename on duplicates: file.txt -> file (n).txt
-  const regex = /(.+[/\\])([^/\\]+?)(?: \((\d+)\))?(\.\w+)/
+  const regex = /^(.+[/\\])([^/\\]+?)(?: \((\d+)\))?(\.\w+)$/
   let filePath = ospath.join(path, filename)
   let [, dir, name, copy, ext] = regex.exec(filePath)
   if (copy === undefined) copy = 1
