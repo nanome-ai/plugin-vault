@@ -28,11 +28,6 @@ Using [Gotenberg](https://github.com/thecodingmachine/gotenberg), the following 
 
 It is highly recommended to run Vault in Docker.
 
-*If you plan to use SSL authentication, add the .pem file to the current directory before Docker Build
-
-To generate a self signed certificate to use for local HTTPS:\
-  `openssl req -new -x509 -keyout cert.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'`
-
 #### Docker Usage
 
 To run with Docker including Gotenberg:
@@ -53,13 +48,13 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 
   Enables enforced authentication, preventing users from accessing files in the Web UI unless they are logged in.
 
+- `--https`
+
+  Enable HTTPS using a self-signed certificate. If port is not set, port will default to 443.
+
 - `--keep-files-days days`
 
   Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `--keep-files-days 14`
-
-- `-s certfile` or `--ssl-cert certfile`
-
-  SSL certificate to be used for HTTPS. If port is not set, port will default to 443. Example: `-s ./cert.pem`
 
 - `-u url` or `--url url`
 
