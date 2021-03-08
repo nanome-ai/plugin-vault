@@ -43,6 +43,7 @@ class Vault(nanome.PluginInstance):
         (location, filename, data) = request.get_args()
         path = os.path.join(self.account, location)
         VaultManager.add_file(path, filename, data)
+        request.send_response(True)
 
     def update_account(self, info):
         if not info.account_id:
