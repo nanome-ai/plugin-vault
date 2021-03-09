@@ -6,8 +6,6 @@ import nanome
 from nanome.util import Color
 from nanome.util.enums import ExportFormats
 
-from .. import VaultManager
-
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 MENU_PATH = os.path.join(BASE_DIR, 'json', 'menu.json')
 LIST_ITEM_PATH = os.path.join(BASE_DIR, 'json', 'list_item.json')
@@ -138,7 +136,7 @@ class VaultMenu:
 
     def update(self):
         self.selected_items = []
-        items = VaultManager.list_path(self.path, self.folder_key)
+        items = self.plugin.vault.list_path(self.path, self.folder_key)
         at_root = self.path == '.'
 
         if at_root:
@@ -283,7 +281,7 @@ class VaultMenu:
         key = self.inp_unlock.input_text
         path = os.path.join(self.path, self.folder_to_unlock)
 
-        if VaultManager.is_key_valid(path, key):
+        if self.plugin.vault.is_key_valid(path, key):
             self.folder_key = key
             self.open_folder(self.folder_to_unlock)
             self.cancel_open_locked()

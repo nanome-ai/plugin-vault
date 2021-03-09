@@ -10,7 +10,8 @@ from nanome.util.enums import NotificationTypes
 from nanome.api.structure import Complex
 
 from .menus import VaultMenu
-from . import VaultManager, Workspace
+from .VaultManager import VaultManager
+from . import Workspace
 
 DEFAULT_WEB_PORT = 80
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures']
@@ -29,7 +30,8 @@ class Vault(nanome.PluginInstance):
 
         self.account = 'user-00000000'
         self.menu = VaultMenu(self, self.get_server_url())
-        self.extensions = VaultManager.get_extensions()
+        self.vault = VaultManager(self.custom_data[2])
+        self.extensions = self.vault.get_extensions()
 
     def on_run(self):
         self.on_presenter_change()
@@ -42,7 +44,7 @@ class Vault(nanome.PluginInstance):
     def on_export_file(self, request):
         (location, filename, data) = request.get_args()
         path = os.path.join(self.account, location)
-        VaultManager.add_file(path, filename, data)
+        self.vault.add_file(path, filename, data)
         request.send_response(True)
 
     def update_account(self, info):
@@ -50,7 +52,7 @@ class Vault(nanome.PluginInstance):
             return
 
         self.account = info.account_id
-        VaultManager.create_path(self.account)
+        self.vault.create_path(self.account)
         self.menu.update()
 
     def load_file(self, name, callback):
@@ -61,7 +63,7 @@ class Vault(nanome.PluginInstance):
 
         temp = tempfile.TemporaryDirectory()
         file_path = os.path.join(temp.name, name)
-        VaultManager.get_file(path, key, file_path)
+        self.vault.get_file(path, key, file_path)
 
         msg = None
 
@@ -115,7 +117,7 @@ class Vault(nanome.PluginInstance):
             key = self.menu.folder_key
             file_name = f'{name}.{extension}'
 
-            VaultManager.add_file(path, file_name, f.read(), key)
+            self.vault.add_file(path, file_name, f.read(), key)
             self.send_notification(NotificationTypes.success, f'"{file_name}" saved')
 
         temp.close() # unsure if needed
@@ -127,7 +129,7 @@ class Vault(nanome.PluginInstance):
         callback()
 
     def get_server_url(self):
-        url, port = self.custom_data
+        url, port, _ = self.custom_data
         if url is not None:
             return url
 
@@ -146,13 +148,16 @@ class Vault(nanome.PluginInstance):
 
 def main():
     # Plugin server (for Web)
+    api_key = None
     https = False
     url = None
     port = None
 
     try:
         for i, arg in enumerate(sys.argv):
-            if arg in ['--https', '-s', '--ssl-cert']:
+            if arg == '--api-key':
+                api_key = sys.argv[i + 1]
+            elif arg in ['--https', '-s', '--ssl-cert']:
                 https = True
             elif arg in ['-u', '--url']:
                 url = sys.argv[i + 1]
@@ -167,7 +172,7 @@ def main():
     # Plugin
     plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False)
     plugin.set_plugin_class(Vault)
-    plugin.set_custom_data(url, port)
+    plugin.set_custom_data(url, port, api_key)
     plugin.run()
 
 if __name__ == '__main__':

@@ -34,6 +34,9 @@ SERVER_PORT=80
 PORT=
 ARGS=$*
 
+# generate random hex api key
+API_KEY=`od -vN "16" -An -tx1 /dev/urandom | tr -d " \n"`
+
 while [ "$1" != "" ]; do
     case $1 in
         --https | -s | --ssl-cert )
@@ -58,7 +61,7 @@ docker run -d \
 --name vault \
 --restart unless-stopped \
 --network vault-network \
--e ARGS="$ARGS" \
+-e ARGS="$ARGS --api-key $API_KEY" \
 vault
 
 docker run -d \
@@ -66,6 +69,6 @@ docker run -d \
 --restart unless-stopped \
 --network vault-network \
 -p $PORT:$SERVER_PORT \
--e ARGS="$ARGS" \
+-e ARGS="$ARGS --api-key $API_KEY" \
 -v vault-volume:/root \
 vault-server

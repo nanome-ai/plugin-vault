@@ -11,7 +11,9 @@ const args = process.argv.slice(2)
 while (args.length) {
   const arg = args.shift()
 
-  if (['-c', '--converter-url'].includes(arg)) {
+  if (arg === '--api-key') {
+    config.API_KEY = args.shift()
+  } else if (['-c', '--converter-url'].includes(arg)) {
     config.CONVERTER_URL = args.shift()
   } else if (arg === '--enable-auth') {
     config.ENABLE_AUTH = true

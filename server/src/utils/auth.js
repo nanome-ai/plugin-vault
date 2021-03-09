@@ -8,6 +8,9 @@ const CACHE = {}
 module.exports = async (req, res, next) => {
   if (!config.ENABLE_AUTH) return next()
 
+  const apiKey = req.headers['vault-api-key']
+  if (apiKey && apiKey === config.API_KEY) return next()
+
   const auth = req.headers.authorization
   if (!auth) return next(HTTPError.UNAUTHORIZED)
 
