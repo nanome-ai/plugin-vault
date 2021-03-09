@@ -19,7 +19,7 @@ def get(path, key):
 
 # add data to vault at path/filename, where filename can contain a path
 def add_file(path, filename, data, key=None):
-    command('upload', path, {'key': key}, (filename, data))
+    command('upload', path, {'key': key}, {'files': (filename, data)})
 
 # creates a path and returns True. returns False if path exists
 def create_path(path):
