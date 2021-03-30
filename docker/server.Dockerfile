@@ -10,4 +10,6 @@ COPY . .
 
 EXPOSE 80 443
 
+ENV NO_PROXY vault-converter
+
 CMD yarn start ${ARGS}
