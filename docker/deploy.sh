@@ -3,22 +3,22 @@
 echo "./deploy.sh $*" > redeploy.sh
 chmod +x redeploy.sh
 
-if [ "$(docker ps -aq -f name=vault)" != "" ]; then
-    echo "removing exited container"
+if [ -n "$(docker ps -aqf name=vault$)" ]; then
+    echo "removing existing container"
     docker rm -f vault
 fi
 
-if [ "$(docker ps -aq -f name=vault-server)" != "" ]; then
-    echo "removing exited container"
+if [ -n "$(docker ps -aqf name=vault-server)" ]; then
+    echo "removing existing container"
     docker rm -f vault-server
 fi
 
-if [ "$(docker network ls -qf name=vault-network)" == "" ]; then
+if [ -z "$(docker network ls -qf name=vault-network)" ]; then
     echo "creating network"
     docker network create --driver bridge vault-network
 fi
 
-if [ "$(docker ps -qf name=vault-converter)" == "" ]; then
+if [ -z "$(docker ps -qf name=vault-converter)" ]; then
     echo "starting vault-converter"
     docker run --rm -d \
     --name vault-converter \
@@ -37,7 +37,7 @@ ARGS=$*
 # generate random hex api key
 API_KEY=`od -vN "16" -An -tx1 /dev/urandom | tr -d " \n"`
 
-while [ "$1" != "" ]; do
+while [ -n "$1" ]; do
     case $1 in
         --https | -s | --ssl-cert )
             if [ -z "$PORT" ]; then

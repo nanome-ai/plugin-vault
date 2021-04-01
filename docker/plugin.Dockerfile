@@ -1,14 +1,13 @@
 FROM nanome/plugin-env
 
 ENV ARGS=''
-
-RUN pip install pycryptodome
+WORKDIR /app
 
 ARG CACHEBUST
-RUN pip install nanome
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-COPY . /app
-WORKDIR /app
+COPY . .
 
 ENV NO_PROXY vault-server
 

@@ -1,9 +1,6 @@
 __pycache__
 node_modules
 /.vscode
-/build
-/dist
 /docker/.cachebust
 /docker/redeploy.sh
-*.egg-info
 *.log

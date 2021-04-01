@@ -1,6 +1,6 @@
 # Nanome - Vault
 
-### A Nanome plugin that creates a web interface to upload files and make them available in Nanome
+### A Nanome Plugin that creates a web interface to upload files and make them available in Nanome
 
 Nanome Vault will start a web server. Other people can upload molecules or other files to it, and they will appear in Nanome. This works for both Nanome & Nanome Curie (Quest edition).
 
@@ -24,13 +24,9 @@ Using [Gotenberg](https://github.com/thecodingmachine/gotenberg), the following 
 - Documents: `.doc` `.docx` `.txt` `.rtf` `.odt`
 - Presentations: `.ppt` `.pptx` `.odp`
 
-### Installation
+## Usage
 
-It is highly recommended to run Vault in Docker.
-
-#### Docker Usage
-
-To run with Docker including Gotenberg:
+To run Vault in a Docker container:
 
 ```sh
 $ cd docker
@@ -38,7 +34,7 @@ $ ./build.sh
 $ ./deploy.sh -a <plugin_server_address> [optional args]
 ```
 
-#### Optional arguments:
+### Optional arguments:
 
 - `-c url` or `--converter-url url`
 
@@ -72,58 +68,39 @@ In Nanome:
 - Click Run
 - Open your web browser, go to "127.0.0.1" (or your computer's IP address from another computer), and add supported files. Your files will appear in Nanome.
 
+## Development
 
+To run Vault plugin with autoreload:
 
-### Running as Python Script
 ```sh
-$ pip3 install nanome-vault --upgrade
+$ python3 -m pip install -r requirements.txt
+$ python3 run.py -r -a <plugin_server_address> [optional args]
 ```
 
-### Usage
+---
 
-To start the plugin:
+To run Vault server with autoreload:
 
 ```sh
-$ nanome-vault -a <plugin_server_address> [optional args]
+$ cd server
+$ yarn install
+$ yarn run dev
 ```
 
-On Linux, you might have to start using `sudo nanome-vault` to listen on port 80.
+Note: when running outside of Docker, you will need to replace "vault-server" in VaultManager.py with "localhost".
 
-To utilize file conversion (to support files like `.ppt` and `.doc`), launch Gotenberg:
+---
 
-```sh
-$ docker run --rm -p 3000:3000 thecodingmachine/gotenberg:6
-```
-
-and add `-c http://localhost:3000` as an argument when you start the plugin.
-
-
-### Development
-
-Ensure you have the latest `nanome` lib installed with:
+To run the WebUI with autoreload:
 
 ```sh
-$ pip3 install nanome --upgrade
-```
-
-Run the plugin and web server:
-
-```sh
-$ python run.py -a <plugin_server_address> [optional args]
-```
-
-#### Web UI Development
-
-Run the Vue.js dev server in another terminal while plugin is running:
-
-```sh
-$ cd nanome_vault/WebUI
+$ cd server/ui
 $ yarn install
 $ yarn run serve
 ```
 
-Note: this will only work if the plugin's web server is started on the default port (without using the `-w` option). To work with a non-default port, change the proxy settings in `vue.config.js`.
+Note: this will only work if the Vault server is running on the default port (without using the `-w` option). To work with a non-default port, change the proxy settings in `vue.config.js`.
 
-### License
+## License
 
 MIT
