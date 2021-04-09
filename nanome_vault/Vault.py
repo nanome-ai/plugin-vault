@@ -56,6 +56,7 @@ class Vault(nanome.PluginInstance):
         self.vault.create_path(self.account)
 
         if in_account:
+            self.menu.path = '.'
             self.menu.open_folder('.')
         else:
             self.menu.update()
