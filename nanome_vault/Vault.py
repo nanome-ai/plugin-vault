@@ -51,9 +51,14 @@ class Vault(nanome.PluginInstance):
         if not info.account_id:
             return
 
+        in_account = self.account in self.menu.path
         self.account = info.account_id
         self.vault.create_path(self.account)
-        self.menu.update()
+
+        if in_account:
+            self.menu.open_folder('.')
+        else:
+            self.menu.update()
 
     def load_file(self, name, callback):
         item_name, extension = name.rsplit('.', 1)
