@@ -136,7 +136,7 @@ class VaultMenu:
 
     def update(self):
         self.selected_items = []
-        items = self.plugin.vault.list_path(self.path, self.folder_key)
+        items = self.plugin.vault.list_path(self.path + '/', self.folder_key)
         at_root = self.path == '.'
 
         if at_root:
