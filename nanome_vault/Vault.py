@@ -5,7 +5,7 @@ import tempfile
 from functools import partial
 
 import nanome
-from nanome.util import Logs
+from nanome.util import async_callback, Logs
 from nanome.util.enums import NotificationTypes
 from nanome.api.structure import Complex
 
@@ -17,7 +17,7 @@ DEFAULT_WEB_PORT = 80
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures']
 
 # Plugin instance (for Nanome)
-class Vault(nanome.PluginInstance):
+class Vault(nanome.AsyncPluginInstance):
     def start(self):
         self.integration.import_file = lambda _: self.on_run()
         self.integration.export_locations = lambda req: req.send_response(EXPORT_LOCATIONS)
@@ -38,16 +38,15 @@ class Vault(nanome.PluginInstance):
         self.menu.open_folder('.')
         self.menu.show_menu()
 
-    def on_presenter_change(self):
-        self.request_presenter_info(self.update_account)
-
     def on_export_file(self, request):
         (location, filename, data) = request.get_args()
         path = os.path.join(self.account, location)
         self.vault.add_file(path, filename, data)
         request.send_response(True)
 
-    def update_account(self, info):
+    @async_callback
+    async def on_presenter_change(self):
+        info = await self.request_presenter_info()
         if not info.account_id:
             return
 
@@ -61,7 +60,7 @@ class Vault(nanome.PluginInstance):
         else:
             self.menu.update()
 
-    def load_file(self, name, callback):
+    async def load_file(self, name):
         item_name, extension = name.rsplit('.', 1)
 
         path = os.path.join(self.menu.path, name)
@@ -81,9 +80,7 @@ class Vault(nanome.PluginInstance):
                     self.update_workspace(workspace)
                 msg = f'Workspace "{item_name}" loaded'
             except:
-                self.send_files_to_load(file_path)
-            finally:
-                callback()
+                await self.send_files_to_load(file_path)
 
         # macro
         elif extension == 'lua':
@@ -93,16 +90,14 @@ class Vault(nanome.PluginInstance):
                 macro.logic = f.read()
                 macro.save()
             msg = f'Macro "{item_name}" added'
-            callback()
 
         elif extension in self.extensions['supported'] + self.extensions['extras']:
-            self.send_files_to_load(file_path, lambda _: callback())
+            await self.send_files_to_load(file_path)
 
         else:
             error = f'Extension not yet supported: {extension}'
             self.send_notification(NotificationTypes.error, error)
             Logs.warning(error)
-            callback()
 
         if msg is not None:
             self.send_notification(NotificationTypes.success, msg)
@@ -128,11 +123,6 @@ class Vault(nanome.PluginInstance):
 
         temp.close() # unsure if needed
         os.remove(temp.name)
-
-    def send_complexes(self, complexes, callback):
-        self.add_to_workspace(complexes)
-        self.send_notification(NotificationTypes.success, f'"{complexes[0].name}" loaded')
-        callback()
 
     def get_server_url(self):
         url, port, _ = self.custom_data

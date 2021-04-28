@@ -1,9 +1,10 @@
+import asyncio
 import os
 import sys
 from functools import partial
 
 import nanome
-from nanome.util import Color
+from nanome.util import async_callback, Color
 from nanome.util.enums import ExportFormats
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -181,9 +182,9 @@ class VaultMenu:
         old_items = set(map(lambda item: item.name, self.lst_files.items))
         new_items = folders + files
 
-        add_set = set(new_items)
-        remove_items = old_items - add_set
-        add_items = add_set - old_items
+        new_set = set(new_items)
+        remove_items = old_items - new_set
+        add_items = new_set - old_items
         changed = False
 
         for item in remove_items:
@@ -228,26 +229,26 @@ class VaultMenu:
             btn.icon.size = 0.5
             btn.icon.position.x = 0.9
 
-        def on_file_pressed(button):
-            button.selected = not button.selected
-            if button.selected:
-                self.selected_items.append(button)
-            else:
-                self.selected_items.remove(button)
-
-            self.update_load_button()
-            self.plugin.update_content(button)
-
-        def on_folder_pressed(button):
-            self.open_folder(button.item_name)
-
-        cb = on_folder_pressed if is_folder else on_file_pressed
+        cb = self.on_folder_pressed if is_folder else self.on_file_pressed
         btn.register_pressed_callback(cb)
 
         if index is None:
             self.lst_files.items.append(new_item)
         else:
             self.lst_files.items.insert(index, new_item)
+
+    def on_file_pressed(self, button):
+        button.selected = not button.selected
+        if button.selected:
+            self.selected_items.append(button)
+        else:
+            self.selected_items.remove(button)
+
+        self.update_load_button()
+        self.plugin.update_content(button)
+
+    def on_folder_pressed(self, button):
+        self.open_folder(button.item_name)
 
     def remove_item(self, name):
         items = self.lst_files.items
@@ -294,21 +295,10 @@ class VaultMenu:
         self.ln_unlock.enabled = False
         self.plugin.update_menu(self.menu)
 
-    def load_files(self, button=None):
+    @async_callback
+    async def load_files(self, button=None):
         if not self.selected_items:
             return
-
-        def on_load():
-            self.selected_items = []
-            self.lst_files.parent.enabled = True
-            self.lbl_loading.parent.enabled = False
-            self.update_load_button()
-            self.plugin.update_menu(self.menu)
-
-        def callback():
-            nonlocal n
-            if n > 1: n -= 1
-            else: on_load()
 
         n = len(self.selected_items)
         self.lst_files.parent.enabled = False
@@ -316,9 +306,17 @@ class VaultMenu:
         self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
         self.plugin.update_menu(self.menu)
 
+        load_requests = []
         for btn in self.selected_items:
-            self.plugin.load_file(btn.item_name, callback)
+            load_requests.append(self.plugin.load_file(btn.item_name))
             btn.selected = False
+        await asyncio.gather(*load_requests)
+
+        self.selected_items = []
+        self.lst_files.parent.enabled = True
+        self.lbl_loading.parent.enabled = False
+        self.update_load_button()
+        self.plugin.update_menu(self.menu)
 
     def toggle_upload(self, button=None, show=None):
         show = not self.showing_upload if show is None else show
@@ -375,21 +373,21 @@ class VaultMenu:
 
         self.plugin.update_menu(self.menu)
 
-    def upload_workspace(self, button=None):
+    @async_callback
+    async def upload_workspace(self, button=None):
         name = self.inp_workspace_name.input_text
         if not name:
             return
 
-        def on_export(results):
-            self.upload_item = results[0]
-            self.upload_name = name
-            self.upload_ext = 'nanome'
-            self.ln_upload_workspace.enabled = False
-            self.show_upload_confirm()
+        results = await self.plugin.request_export(ExportFormats.Nanome)
+        self.upload_item = results[0]
+        self.upload_name = name
+        self.upload_ext = 'nanome'
+        self.ln_upload_workspace.enabled = False
+        self.show_upload_confirm()
 
-        self.plugin.request_export(ExportFormats.Nanome, on_export)
-
-    def show_upload_macro(self):
+    @async_callback
+    async def show_upload_macro(self):
         def select_macro(button):
             self.upload_item = button.macro.logic
             self.upload_name = button.macro.title
@@ -397,60 +395,56 @@ class VaultMenu:
             self.lst_upload.parent.enabled = False
             self.show_upload_confirm()
 
-        def on_macro_list(macros):
-            self.lst_upload.items = []
-            for macro in macros:
-                item = self.pfb_list_item.clone()
-                lbl = item.find_node('LabelNode').get_content()
-                lbl.text_value = macro.title
-                btn = item.find_node('ButtonNode').get_content()
-                btn.macro = macro
-                btn.register_pressed_callback(select_macro)
-                self.lst_upload.items.append(item)
+        macros = await nanome.api.macro.Macro.get_live()
+        self.lst_upload.items = []
+        for macro in macros:
+            item = self.pfb_list_item.clone()
+            lbl = item.find_node('LabelNode').get_content()
+            lbl.text_value = macro.title
+            btn = item.find_node('ButtonNode').get_content()
+            btn.macro = macro
+            btn.register_pressed_callback(select_macro)
+            self.lst_upload.items.append(item)
 
-            if not macros:
-                self.lst_upload.parent.enabled = False
-                self.show_upload_message('no macros found')
-            else:
-                self.plugin.update_content(self.lst_upload)
+        if not macros:
+            self.lst_upload.parent.enabled = False
+            self.show_upload_message('no macros found')
+        else:
+            self.plugin.update_content(self.lst_upload)
 
-        nanome.api.macro.Macro.get_live(on_macro_list)
-
-    def show_upload_complex(self):
+    @async_callback
+    async def show_upload_complex(self):
         def select_complex(button):
             self.upload_item = button.complex
             self.lst_upload.parent.enabled = False
             self.ln_upload_complex_type.enabled = True
             self.plugin.update_menu(self.menu)
 
-        def on_complex_list(complexes):
-            self.lst_upload.items = []
-            for complex in complexes:
-                item = self.pfb_list_item.clone()
-                lbl = item.find_node('LabelNode').get_content()
-                lbl.text_value = complex.full_name
-                btn = item.find_node('ButtonNode').get_content()
-                btn.complex = complex
-                btn.register_pressed_callback(select_complex)
-                self.lst_upload.items.append(item)
+        complexes = await self.plugin.request_complex_list()
+        self.lst_upload.items = []
+        for complex in complexes:
+            item = self.pfb_list_item.clone()
+            lbl = item.find_node('LabelNode').get_content()
+            lbl.text_value = complex.full_name
+            btn = item.find_node('ButtonNode').get_content()
+            btn.complex = complex
+            btn.register_pressed_callback(select_complex)
+            self.lst_upload.items.append(item)
 
-            if not complexes:
-                self.lst_upload.parent.enabled = False
-                self.show_upload_message('no structures found')
-            else:
-                self.plugin.update_content(self.lst_upload)
+        if not complexes:
+            self.lst_upload.parent.enabled = False
+            self.show_upload_message('no structures found')
+        else:
+            self.plugin.update_content(self.lst_upload)
 
-        self.plugin.request_complex_list(on_complex_list)
-
-    def upload_complex(self, extension, format, button):
-        def on_export(results):
-            self.upload_name = self.upload_item.name
-            self.upload_item = results[0]
-            self.upload_ext = extension
-            self.ln_upload_complex_type.enabled = False
-            self.show_upload_confirm()
-
-        self.plugin.request_export(format, on_export, [self.upload_item.index])
+    @async_callback
+    async def upload_complex(self, extension, format, button):
+        results = await self.plugin.request_export(format, entities=[self.upload_item.index])
+        self.upload_name = self.upload_item.name
+        self.upload_item = results[0]
+        self.upload_ext = extension
+        self.ln_upload_complex_type.enabled = False
+        self.show_upload_confirm()
 
     def show_upload_message(self, message=None):
         self.ln_upload_message.enabled = True
