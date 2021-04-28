@@ -60,7 +60,7 @@ class Vault(nanome.AsyncPluginInstance):
         else:
             self.menu.update()
 
-    def load_file(self, name, callback):
+    async def load_file(self, name):
         item_name, extension = name.rsplit('.', 1)
 
         path = os.path.join(self.menu.path, name)
@@ -80,9 +80,7 @@ class Vault(nanome.AsyncPluginInstance):
                     self.update_workspace(workspace)
                 msg = f'Workspace "{item_name}" loaded'
             except:
-                self.send_files_to_load(file_path)
-            finally:
-                callback()
+                await self.send_files_to_load(file_path)
 
         # macro
         elif extension == 'lua':
@@ -92,16 +90,14 @@ class Vault(nanome.AsyncPluginInstance):
                 macro.logic = f.read()
                 macro.save()
             msg = f'Macro "{item_name}" added'
-            callback()
 
         elif extension in self.extensions['supported'] + self.extensions['extras']:
-            self.send_files_to_load(file_path, lambda _: callback())
+            await self.send_files_to_load(file_path)
 
         else:
             error = f'Extension not yet supported: {extension}'
             self.send_notification(NotificationTypes.error, error)
             Logs.warning(error)
-            callback()
 
         if msg is not None:
             self.send_notification(NotificationTypes.success, msg)

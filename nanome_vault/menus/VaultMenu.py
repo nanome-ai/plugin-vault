@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 from functools import partial
@@ -294,21 +295,10 @@ class VaultMenu:
         self.ln_unlock.enabled = False
         self.plugin.update_menu(self.menu)
 
-    def load_files(self, button=None):
+    @async_callback
+    async def load_files(self, button=None):
         if not self.selected_items:
             return
-
-        def on_load():
-            nonlocal n
-            if n > 1:
-                n -= 1
-                return
-
-            self.selected_items = []
-            self.lst_files.parent.enabled = True
-            self.lbl_loading.parent.enabled = False
-            self.update_load_button()
-            self.plugin.update_menu(self.menu)
 
         n = len(self.selected_items)
         self.lst_files.parent.enabled = False
@@ -316,9 +306,17 @@ class VaultMenu:
         self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
         self.plugin.update_menu(self.menu)
 
+        load_requests = []
         for btn in self.selected_items:
-            self.plugin.load_file(btn.item_name, on_load)
+            load_requests.append(self.plugin.load_file(btn.item_name))
             btn.selected = False
+        await asyncio.gather(*load_requests)
+
+        self.selected_items = []
+        self.lst_files.parent.enabled = True
+        self.lbl_loading.parent.enabled = False
+        self.update_load_button()
+        self.plugin.update_menu(self.menu)
 
     def toggle_upload(self, button=None, show=None):
         show = not self.showing_upload if show is None else show
