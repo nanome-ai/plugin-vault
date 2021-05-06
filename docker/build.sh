@@ -21,4 +21,4 @@ fi
 
 cachebust=`cat .cachebust`
 docker build -f plugin.Dockerfile --build-arg CACHEBUST=$cachebust -t vault:latest ..
-docker build -f server.Dockerfile -t vault-server:latest ../server
+docker build -f server.Dockerfile -t vault-server:latest ..

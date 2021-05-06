@@ -4,9 +4,9 @@ ENV ARGS=''
 
 WORKDIR /app
 
-COPY yarn.lock package.json ./
+COPY server/yarn.lock server/package.json ./
 RUN yarn install --production
-COPY . .
+COPY server .
 
 EXPOSE 80 443
 
