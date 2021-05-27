@@ -2,12 +2,10 @@ import sys
 import os
 import socket
 import tempfile
-from functools import partial
 
 import nanome
 from nanome.util import async_callback, Logs
-from nanome.util.enums import NotificationTypes
-from nanome.api.structure import Complex
+from nanome.util.enums import Integrations, NotificationTypes
 
 from .menus import VaultMenu
 from .VaultManager import VaultManager
@@ -166,7 +164,12 @@ def main():
         port = 443 if https else DEFAULT_WEB_PORT
 
     # Plugin
-    plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False)
+    integrations = [
+        Integrations.import_file,
+        Integrations.export_locations,
+        Integrations.export_file,
+    ]
+    plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False, integrations=integrations)
     plugin.set_plugin_class(Vault)
     plugin.set_custom_data(url, port, api_key)
     plugin.run()
