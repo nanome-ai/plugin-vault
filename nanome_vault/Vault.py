@@ -36,7 +36,9 @@ class Vault(nanome.AsyncPluginInstance):
         self.menu.open_folder('.')
         self.menu.show_menu()
 
-    def on_export_file(self, request):
+    @async_callback
+    async def on_export_file(self, request):
+        await self.on_presenter_change()
         (location, filename, data) = request.get_args()
         path = os.path.join(self.account, location)
         self.vault.add_file(path, filename, data)
@@ -51,6 +53,9 @@ class Vault(nanome.AsyncPluginInstance):
         in_account = self.account in self.menu.path
         self.account = info.account_id
         self.vault.create_path(self.account)
+
+        if not self.menu.menu.enabled:
+            return
 
         if in_account:
             self.menu.path = '.'
