@@ -81,9 +81,8 @@ export default {
 
   methods: {
     onDragEnter(e) {
-      const { types } = e.dataTransfer
       this.numEvents++
-      this.numDropping = types.filter(t => t === 'Files').length
+      this.numDropping = e.dataTransfer.items.length
       this.showDropzone = true
     },
 
