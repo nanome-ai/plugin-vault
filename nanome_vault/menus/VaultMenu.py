@@ -136,13 +136,19 @@ class VaultMenu:
         self.update()
 
     def update(self):
-        self.selected_items = []
+        self.selected_items.clear()
         items = self.plugin.vault.list_path(self.path + '/', self.folder_key)
         at_root = self.path == '.'
 
         if at_root:
             account = self.plugin.account
-            items['folders'].append(account)
+            items['folders'].append({
+                'name': account,
+                'size': '',
+                'size_text': '',
+                'created': '',
+                'created_text': '',
+            })
 
         if self.btn_upload.unusable != at_root:
             self.btn_upload.unusable = at_root
@@ -176,30 +182,15 @@ class VaultMenu:
         if self.locked_path is None:
             self.folder_key = None
 
-        folders = items['folders']
-        files = items['files']
+        self.lst_files.items.clear()
 
-        old_items = set(map(lambda item: item.name, self.lst_files.items))
-        new_items = folders + files
+        for folder in items['folders']:
+            self.add_item(folder, True)
 
-        new_set = set(new_items)
-        remove_items = old_items - new_set
-        add_items = new_set - old_items
-        changed = False
+        for file in items['files']:
+            self.add_item(file, False)
 
-        for item in remove_items:
-            self.remove_item(item)
-            changed = True
-
-        # iterate list to preserve ordering
-        for index, item in enumerate(new_items):
-            if item not in add_items:
-                continue
-            self.add_item(item, item in folders, index)
-            changed = True
-
-        if changed or not len(old_items):
-            self.plugin.update_content(self.lst_files)
+        self.plugin.update_content(self.lst_files)
 
     def update_load_button(self):
         n = len(self.selected_items)
@@ -209,9 +200,12 @@ class VaultMenu:
         self.btn_load.text.value.set_all('Load' + items_text)
         self.plugin.update_content(self.btn_load)
 
-    def add_item(self, name, is_folder, index=None):
+    def add_item(self, item, is_folder):
+        name = item['name']
         new_item = self.pfb_list_item.clone()
         new_item.name = name
+        new_item.is_folder = is_folder
+
         ln_btn = new_item.find_node('ButtonNode')
         btn = ln_btn.get_content()
         btn.item_name = name
@@ -232,10 +226,7 @@ class VaultMenu:
         cb = self.on_folder_pressed if is_folder else self.on_file_pressed
         btn.register_pressed_callback(cb)
 
-        if index is None:
-            self.lst_files.items.append(new_item)
-        else:
-            self.lst_files.items.insert(index, new_item)
+        self.lst_files.items.append(new_item)
 
     def on_file_pressed(self, button):
         button.selected = not button.selected
@@ -249,13 +240,6 @@ class VaultMenu:
 
     def on_folder_pressed(self, button):
         self.open_folder(button.item_name)
-
-    def remove_item(self, name):
-        items = self.lst_files.items
-        for child in items:
-            if child.name == name:
-                items.remove(child)
-                break
 
     def open_folder(self, folder):
         if folder in self.locked_folders and not self.folder_key:
