@@ -2,7 +2,10 @@ const fs = require('fs-extra')
 const os = require('os')
 const ospath = require('path')
 const walk = require('@nodelib/fs.walk')
+
 const aes = require('./aes-cipher')
+const config = require('@/config')
+const du = require('@/utils/du')
 const { HTTPError } = require('@/utils/error')
 
 // walk settings to find all files not starting with '.'
@@ -27,13 +30,21 @@ exports.FILES_DIR = FILES_DIR
 
 // add data to vault at path/filename, where filename can contain a path
 exports.addFile = (path, filename, data, key) => {
-  path = exports.getVaultPath(path, false)
+  const match = /^(user-[0-9a-f]{8})/.exec(path)
+  if (match && config.USER_STORAGE) {
+    const userPath = exports.getVaultPath(match[1], false)
+    if (du(userPath) + data.length > config.USER_STORAGE) {
+      const msg = `User storage exceeded (max ${config.USER_STORAGE_MSG})`
+      throw new HTTPError(413, msg)
+    }
+  }
 
   if (key !== undefined) {
     data = aes.encrypt(data, key)
   }
 
   // create folder paths
+  path = exports.getVaultPath(path, false)
   const subFolder = ospath.join(path, ospath.dirname(filename))
   fs.ensureDirSync(subFolder)
 

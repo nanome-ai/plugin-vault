@@ -41,8 +41,8 @@ class Vault(nanome.AsyncPluginInstance):
         await self.on_presenter_change()
         (location, filename, data) = request.get_args()
         path = os.path.join(self.account, location)
-        self.vault.add_file(path, filename, data)
-        request.send_response(True)
+        r = self.vault.add_file(path, filename, data)
+        request.send_response(r.ok)
 
     @async_callback
     async def on_presenter_change(self):
@@ -121,8 +121,11 @@ class Vault(nanome.AsyncPluginInstance):
             key = self.menu.folder_key
             file_name = f'{name}.{extension}'
 
-            self.vault.add_file(path, file_name, f.read(), key)
-            self.send_notification(NotificationTypes.success, f'"{file_name}" saved')
+            r = self.vault.add_file(path, file_name, f.read(), key)
+            if r.ok:
+                self.send_notification(NotificationTypes.success, f'"{file_name}" saved')
+            else:
+                self.send_notification(NotificationTypes.error, r.json()['error']['message'])
 
         temp.close() # unsure if needed
         os.remove(temp.name)

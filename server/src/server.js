@@ -19,6 +19,16 @@ while (args.length) {
     config.ENABLE_AUTH = true
   } else if (arg === '--keep-files-days') {
     config.KEEP_FILES_DAYS = args.shift()
+  } else if (arg === '--user-storage') {
+    const size = args.shift()
+    const match = /^(?<num>\d+(\.\d+)?)(?<unit>[BbKkMmGg][Bb]?)?/.exec(size)
+    const unit = (match.groups.unit || '').toLowerCase()
+
+    const n = { k: 1, m: 2, g: 3 }[unit] || 0
+    const num = +match.groups.num
+
+    config.USER_STORAGE = num * 1024 ** n
+    config.USER_STORAGE_MSG = num + ['B', 'KB', 'MB', 'GB'][n]
   }
 }
 

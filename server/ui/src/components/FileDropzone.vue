@@ -146,10 +146,9 @@ export default {
         if (res.code !== 200) {
           this.$modal.alert({
             title: 'Upload Failed',
-            body: res.error
+            body: res.error.message
           })
         } else {
-          this.$emit('upload')
           if (res.failed) {
             const list = res.failed.join('<br>')
             this.$modal.alert({
@@ -161,6 +160,7 @@ export default {
             this.$router.push(path)
           }
         }
+        this.$emit('upload')
       }
 
       this.isConverting = false
