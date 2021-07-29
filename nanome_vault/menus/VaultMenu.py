@@ -1,5 +1,6 @@
 import asyncio
 import os
+import urllib.parse
 import sys
 from functools import partial
 
@@ -29,11 +30,6 @@ class VaultMenu:
         self.pfb_list_item = nanome.ui.LayoutNode.io.from_json(LIST_ITEM_PATH)
 
         # outer wrapper components
-        def open_url(button):
-            self.plugin.open_url(self.address)
-        url_button = root.find_node('URLButton').get_content()
-        url_button.register_pressed_callback(open_url)
-
         def go_up(button):
             self.open_folder('..')
             self.toggle_upload(show=False)
@@ -46,8 +42,11 @@ class VaultMenu:
         self.btn_up.icon.size = 0.5
         self.btn_up.icon.color.unusable = Color.Grey()
 
-        self.btn_upload = root.find_node('UploadButton').get_content()
-        self.btn_upload.register_pressed_callback(self.toggle_upload)
+        self.btn_actions = root.find_node('ActionsButton').get_content()
+        self.btn_actions.register_pressed_callback(self.toggle_actions)
+
+        self.btn_select = root.find_node('SelectButton').get_content()
+        self.btn_select.register_pressed_callback(self.select_all)
 
         self.btn_load = root.find_node('LoadButton').get_content()
         self.btn_load.register_pressed_callback(self.load_files)
@@ -67,6 +66,38 @@ class VaultMenu:
         ln_file_loading = root.find_node('FileLoading')
         self.lbl_loading = ln_file_loading.get_content()
         self.lbl_loading.parent = ln_file_loading
+
+        # actions components
+        self.ln_actions_panel = root.find_node('ActionsPanel')
+        self.ln_actions_panel.get_content().register_pressed_callback(self.toggle_actions)
+
+        self.ln_actions_list = self.ln_actions_panel.find_node('Actions')
+        self.ln_actions_dialog = self.ln_actions_panel.find_node('ConfirmDialog')
+
+        self.lst_actions = root.find_node('ActionsList').get_content()
+        self.inp_rename = self.ln_actions_dialog.find_node('Input')
+
+        btn_cancel_action = self.ln_actions_dialog.find_node('Cancel').get_content()
+        btn_cancel_action.register_pressed_callback(self.on_cancel_action)
+        btn_confirm_action = self.ln_actions_dialog.find_node('Confirm').get_content()
+        btn_confirm_action.register_pressed_callback(self.on_confirm_action)
+
+        self.pending_action = None
+
+        # sort order
+        for sort in ['Name', 'Size', 'Date Added']:
+            btn = self.ln_actions_panel.find_node(sort).get_content()
+            btn.register_pressed_callback(self.change_sort)
+            btn.icon.value.set_all(UP_ICON_PATH)
+            btn.icon.rotation.z = 180
+
+        btn = self.ln_actions_panel.find_node('Name').get_content()
+        self.sort_btn = btn
+        btn.selected = True
+        btn.icon.active = True
+
+        self.sort_by = 'name'
+        self.sort_order = 1
 
         # unlock components
         self.ln_unlock = root.find_node('UnlockFolder')
@@ -150,13 +181,9 @@ class VaultMenu:
                 'created_text': '',
             })
 
-        if self.btn_upload.unusable != at_root:
-            self.btn_upload.unusable = at_root
-            self.plugin.update_content(self.btn_upload)
-
         self.update_crumbs()
-        self.update_load_button()
         self.update_explorer(items)
+        self.update_controls()
 
     def update_crumbs(self):
         at_root = self.path == '.'
@@ -184,13 +211,59 @@ class VaultMenu:
 
         self.lst_files.items.clear()
 
-        for folder in items['folders']:
+        # sort desc for 1 unless sorting by name
+        if self.sort_by == 'name':
+            reverse = self.sort_order == -1
+            key_fn = lambda x: x[self.sort_by].lower()
+        else:
+            reverse = self.sort_order == 1
+            key_fn = lambda x: x[self.sort_by]
+
+        folders = sorted(items['folders'], key=key_fn, reverse=reverse)
+        files = sorted(items['files'], key=key_fn, reverse=reverse)
+
+        for folder in folders:
             self.add_item(folder, True)
 
-        for file in items['files']:
+        for file in files:
             self.add_item(file, False)
 
         self.plugin.update_content(self.lst_files)
+
+    def update_actions(self):
+        def make_action(action):
+            ln = nanome.ui.LayoutNode()
+            btn = ln.add_new_button(action)
+            btn.name = action
+            btn.register_pressed_callback(self.on_action_pressed)
+            return ln
+
+        self.lst_actions.items.clear()
+        self.lst_actions.items.append(make_action('Open Website'))
+
+        if self.path != '.' and not self.selected_items:
+            self.lst_actions.items.append(make_action('Upload Here'))
+            self.lst_actions.items.append(make_action('New Folder'))
+
+            if self.path not in [self.plugin.account, 'shared']:
+                self.lst_actions.items.append(make_action('Rename Folder'))
+                self.lst_actions.items.append(make_action('Delete Folder'))
+
+        if len(self.selected_items) == 1:
+            self.lst_actions.items.append(make_action('Rename'))
+
+        if self.selected_items:
+            self.lst_actions.items.append(make_action('Delete'))
+
+        self.plugin.update_content(self.lst_actions)
+
+    def update_select_button(self):
+        num_files = sum(1 for i in self.lst_files.items if not i.is_folder)
+        self.btn_select.unusable = num_files == 0
+
+        btn_text = 'Deselect All' if self.selected_items else 'Select All'
+        self.btn_select.text.value.set_all(btn_text)
+        self.plugin.update_content(self.btn_select)
 
     def update_load_button(self):
         n = len(self.selected_items)
@@ -199,6 +272,11 @@ class VaultMenu:
         self.btn_load.unusable = n == 0
         self.btn_load.text.value.set_all('Load' + items_text)
         self.plugin.update_content(self.btn_load)
+
+    def update_controls(self):
+        self.update_actions()
+        self.update_select_button()
+        self.update_load_button()
 
     def add_item(self, item, is_folder):
         name = item['name']
@@ -216,6 +294,11 @@ class VaultMenu:
 
         if is_folder:
             lbl.text_value += '/'
+
+        if self.sort_by != 'name':
+            info = item['size_text' if self.sort_by == 'size' else 'created_text']
+            lbl_info = new_item.find_node('InfoNode').get_content()
+            lbl_info.text_value = info
 
         if is_folder and name in self.locked_folders:
             btn.icon.active = True
@@ -235,7 +318,7 @@ class VaultMenu:
         else:
             self.selected_items.remove(button)
 
-        self.update_load_button()
+        self.update_controls()
         self.plugin.update_content(button)
 
     def on_folder_pressed(self, button):
@@ -299,8 +382,137 @@ class VaultMenu:
         self.selected_items = []
         self.lst_files.parent.enabled = True
         self.lbl_loading.parent.enabled = False
-        self.update_load_button()
+        self.update_controls()
         self.plugin.update_menu(self.menu)
+
+    def on_action_pressed(self, button):
+        if button.name == 'Open Website':
+            path = self.path.replace(self.plugin.account, 'account')
+            url = urllib.parse.quote(f'{self.address}/{path}')
+            self.plugin.open_url(url)
+            self.toggle_actions()
+        elif button.name == 'Upload Here':
+            self.toggle_upload()
+            self.toggle_actions()
+        elif button.name == 'New Folder':
+            self.prompt_action('New Folder', 'Please provide a name:', True, 'new folder')
+        elif button.name == 'Rename':
+            name = self.selected_items[0].item_name
+            desc = f'Rename "{name}" to:'
+            self.prompt_action('Rename', desc, True, name.rsplit('.', 1)[0])
+        elif button.name == 'Delete':
+            n = len(self.selected_items)
+            desc = f'Are you sure you want to delete {n} file{"s" if n > 1 else ""}?'
+            self.prompt_action('Delete', desc)
+        elif button.name == 'Rename Folder':
+            folder = self.path.split('/')[-1]
+            desc = f'Rename "{folder}" to:'
+            self.prompt_action('Rename Folder', desc, True, folder)
+        elif button.name == 'Delete Folder':
+            self.prompt_action('Delete Folder', 'Are you sure you want to delete this folder?')
+
+    def prompt_action(self, title, description, show_input=False, input_default=''):
+        self.pending_action = title
+        self.ln_actions_list.enabled = False
+        self.ln_actions_dialog.enabled = True
+
+        self.ln_actions_dialog.find_node('Title').get_content().text_value = title
+        self.ln_actions_dialog.find_node('Description').get_content().text_value = description
+        ln_inp = self.ln_actions_dialog.find_node('Input')
+        ln_inp.enabled = show_input
+        ln_inp.get_content().input_text = input_default
+
+        self.plugin.update_node(self.ln_actions_panel)
+
+    def on_cancel_action(self, button):
+        self.ln_actions_list.enabled = True
+        self.ln_actions_dialog.enabled = False
+        self.plugin.update_node(self.ln_actions_panel)
+
+    def on_confirm_action(self, button):
+        inp_text = self.ln_actions_dialog.find_node('Input').get_content().input_text
+        if self.pending_action == 'New Folder':
+            self.plugin.vault.create_path(f'{self.path}/{inp_text}')
+        elif self.pending_action == 'Rename':
+            name = self.selected_items[0].item_name
+            ext = name.split('.')[-1]
+            new_name = inp_text + '.' + ext
+            self.plugin.vault.rename_path(f'{self.path}/{name}', new_name)
+        elif self.pending_action == 'Delete':
+            for item in self.selected_items:
+                self.plugin.vault.delete_path(f'{self.path}/{item.item_name}')
+        elif self.pending_action == 'Rename Folder':
+            self.plugin.vault.rename_path(self.path, inp_text)
+        elif self.pending_action == 'Delete Folder':
+            self.plugin.vault.delete_path(self.path)
+
+        self.toggle_actions()
+
+        if self.pending_action in ['Rename Folder', 'Delete Folder']:
+            self.open_folder('..')
+        else:
+            self.update()
+
+    def toggle_actions(self, button=None):
+        enabled = not self.ln_actions_panel.enabled
+
+        # hide upload if visible
+        if self.showing_upload and enabled:
+            self.toggle_upload()
+            return
+
+        if enabled:
+            self.ln_actions_list.enabled = True
+            self.ln_actions_dialog.enabled = False
+
+        # update button
+        btn_text = 'Cancel' if enabled or self.showing_upload else 'Actions'
+        self.btn_actions.text.value.set_all(btn_text)
+        self.plugin.update_content(self.btn_actions)
+
+        self.ln_actions_panel.enabled = enabled
+        self.plugin.update_node(self.ln_actions_panel)
+
+    def change_sort(self, button):
+        # reset state of old sort button
+        if self.sort_btn is not None and button != self.sort_btn:
+            self.sort_btn.selected = False
+            self.sort_btn.icon.active = False
+            self.plugin.update_content(self.sort_btn)
+
+        if self.sort_btn == button:
+            # toggle sort direction
+            self.sort_order *= -1
+            button.icon.rotation.z = 180 if self.sort_order == 1 else 0
+        else:
+            self.sort_btn = button
+            self.sort_by = button.name
+            self.sort_order = 1
+            button.icon.rotation.z = 180
+            button.selected = True
+            button.icon.active = True
+
+        self.plugin.update_content(self.sort_btn)
+        self.update()
+
+    def select_all(self, button):
+        if self.selected_items:
+            # deselect all
+            for item in self.selected_items:
+                item.selected = False
+            self.selected_items.clear()
+        else:
+            # select all files
+            self.selected_items.clear()
+            for item in self.lst_files.items:
+                if item.is_folder:
+                    continue
+                btn = item.find_node('ButtonNode').get_content()
+                btn.selected = True
+                self.selected_items.append(btn)
+
+        self.update_controls()
+        self.plugin.update_content(self.lst_files)
 
     def toggle_upload(self, button=None, show=None):
         show = not self.showing_upload if show is None else show
@@ -309,7 +521,8 @@ class VaultMenu:
         self.ln_upload_confirm.enabled = False
         self.ln_upload_message.enabled = show
         self.ln_explorer.enabled = not show
-        self.btn_upload.text.value.set_all('Cancel' if show else 'Upload Here')
+
+        self.btn_actions.text.value.set_all('Cancel' if show else 'Actions')
 
         self.select_upload_type()
         self.plugin.update_menu(self.menu)

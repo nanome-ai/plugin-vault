@@ -1,6 +1,6 @@
 import requests
 
-API = 'http://vault-server/'
+API = 'http://localhost/'
 
 class VaultManager:
     def __init__(self, api_key):
