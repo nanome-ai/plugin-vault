@@ -431,20 +431,26 @@ class VaultMenu:
 
     def on_confirm_action(self, button):
         inp_text = self.ln_actions_dialog.find_node('Input').get_content().input_text
+        key = self.folder_key
+
         if self.pending_action == 'New Folder':
-            self.plugin.vault.create_path(f'{self.path}/{inp_text}')
+            self.plugin.vault.create_path(f'{self.path}/{inp_text}', key)
+
         elif self.pending_action == 'Rename':
             name = self.selected_items[0].item_name
             ext = name.split('.')[-1]
             new_name = inp_text + '.' + ext
-            self.plugin.vault.rename_path(f'{self.path}/{name}', new_name)
+            self.plugin.vault.rename_path(f'{self.path}/{name}', new_name, key)
+
         elif self.pending_action == 'Delete':
             for item in self.selected_items:
-                self.plugin.vault.delete_path(f'{self.path}/{item.item_name}')
+                self.plugin.vault.delete_path(f'{self.path}/{item.item_name}', key)
+
         elif self.pending_action == 'Rename Folder':
-            self.plugin.vault.rename_path(self.path, inp_text)
+            self.plugin.vault.rename_path(self.path, inp_text, key)
+
         elif self.pending_action == 'Delete Folder':
-            self.plugin.vault.delete_path(self.path)
+            self.plugin.vault.delete_path(self.path, key)
 
         self.toggle_actions()
 

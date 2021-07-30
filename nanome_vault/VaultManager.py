@@ -31,8 +31,8 @@ class VaultManager:
         return self.command('upload', path, {'key': key}, {'files': (filename, data)})
 
     # creates a path and returns True. returns False if path exists
-    def create_path(self, path):
-        return self.command('create', path)
+    def create_path(self, path, key=None):
+        return self.command('create', path, {'key': key})
 
     # decrypts full contents of path, return False if key invalid
     def decrypt_folder(self, path, key):
@@ -68,5 +68,5 @@ class VaultManager:
         return r.json()
 
     # renames a file/folder at path and returns True on success, False on error
-    def rename_path(self, path, name):
-        return self.command('rename', path, {'name': name})
+    def rename_path(self, path, name, key=None):
+        return self.command('rename', path, {'name': name, 'key': key})
