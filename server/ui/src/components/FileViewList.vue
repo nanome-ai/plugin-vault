@@ -12,7 +12,7 @@
           />
           <a
             v-if="encrypted.includes(folder.name)"
-            :title="`${folder.name} (${folder.size})`"
+            :title="`${folder.name} (${folder.size_text})`"
             class="file cursor-default"
             @dblclick="openLocked(folder.name)"
             @contextmenu.prevent="contextmenu($event, folder.name + '/', true)"
@@ -29,7 +29,7 @@
           </a>
           <router-link
             v-else
-            :title="`${folder.name} (${folder.size})`"
+            :title="`${folder.name} (${folder.size_text})`"
             :to="`${path}${folder.name}/`"
             class="file cursor-default"
             event="dblclick"
@@ -98,7 +98,7 @@
       <li
         v-for="file in files"
         :key="file.full"
-        :title="`${file.full} (${file.size})`"
+        :title="`${file.full} (${file.size_text})`"
         class="p-2 file"
         @contextmenu.prevent="contextmenu($event, file.full)"
         @dblclick="$root.$emit('download', path + file.full)"

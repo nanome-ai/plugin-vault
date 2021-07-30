@@ -160,7 +160,7 @@ const API = {
     folder.folders = data.folders
     folder.files = data.files.map(f => {
       const [full, name, ext = ''] = /^(.+?)(?:\.(\w+))?$/.exec(f.name)
-      return { full, name, ext, size: f.size_text }
+      return { full, name, ext, size_text: f.size_text }
     })
 
     return folder
