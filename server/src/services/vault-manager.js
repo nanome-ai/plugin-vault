@@ -245,7 +245,7 @@ exports.listPath = path => {
     const isDir = stats.isDirectory()
 
     const bytes = isDir ? du(itemPath) : stats.size
-    const power = Math.floor(Math.log(bytes) / Math.log(1024))
+    const power = bytes && Math.floor(Math.log(bytes) / Math.log(1024))
     const unit = ['B', 'KB', 'MB', 'GB'][power]
     const size = `${(bytes / 1024 ** power).toFixed(1)}${unit}`
 
