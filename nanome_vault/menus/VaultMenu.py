@@ -19,8 +19,27 @@ class VaultMenu:
         self.plugin = plugin
         self.address = address
         self.path = '.'
-        self.showing_upload = False
+
         self.selected_items = []
+        self.showing_upload = False
+
+        self.pending_action = None
+        self.pending_integration = None
+
+        self.sort_btn = None
+        self.sort_by = 'name'
+        self.sort_order = 1
+
+        self.locked_folders = []
+        self.locked_path = None
+        self.folder_key = None
+        self.folder_to_unlock = None
+
+        self.btn_upload_selected = None
+        self.upload_item = None
+        self.upload_name = None
+        self.upload_ext = None
+
         self.create_menu()
 
     def create_menu(self):
@@ -42,18 +61,28 @@ class VaultMenu:
         self.btn_up.icon.size = 0.5
         self.btn_up.icon.color.unusable = Color.Grey()
 
-        self.btn_actions = root.find_node('ActionsButton').get_content()
+        self.ln_controls = root.find_node('Controls')
+        self.ln_main_controls = root.find_node('MainControls')
+        self.ln_integration_controls = root.find_node('IntegrationControls')
+
+        self.btn_actions = self.ln_main_controls.find_node('Actions').get_content()
         self.btn_actions.register_pressed_callback(self.toggle_actions)
 
-        self.btn_select = root.find_node('SelectButton').get_content()
+        self.btn_select = self.ln_main_controls.find_node('Select').get_content()
         self.btn_select.register_pressed_callback(self.select_all)
 
-        self.btn_load = root.find_node('LoadButton').get_content()
+        self.btn_load = self.ln_main_controls.find_node('Load').get_content()
         self.btn_load.register_pressed_callback(self.load_files)
         self.btn_load.disable_on_press = True
 
-        lbl_instr = root.find_node('InstructionLabel').get_content()
-        lbl_instr.text_value = f'Visit {self.address} in browser to add files'
+        btn_integration_cancel = self.ln_integration_controls.find_node('Cancel').get_content()
+        btn_integration_cancel.register_pressed_callback(self.integration_cancel)
+
+        self.btn_integration_save = self.ln_integration_controls.find_node('Save').get_content()
+        self.btn_integration_save.register_pressed_callback(self.integration_save)
+        self.btn_integration_save.disable_on_press = True
+
+        self.lbl_instr = root.find_node('InstructionLabel').get_content()
         self.lbl_crumbs = root.find_node('Breadcrumbs').get_content()
 
         # file explorer components
@@ -75,14 +104,13 @@ class VaultMenu:
         self.ln_actions_dialog = self.ln_actions_panel.find_node('ConfirmDialog')
 
         self.lst_actions = root.find_node('ActionsList').get_content()
-        self.inp_rename = self.ln_actions_dialog.find_node('Input')
 
-        btn_cancel_action = self.ln_actions_dialog.find_node('Cancel').get_content()
-        btn_cancel_action.register_pressed_callback(self.on_cancel_action)
-        btn_confirm_action = self.ln_actions_dialog.find_node('Confirm').get_content()
-        btn_confirm_action.register_pressed_callback(self.on_confirm_action)
-
-        self.pending_action = None
+        inp_dialog_action = self.ln_actions_dialog.find_node('Input').get_content()
+        inp_dialog_action.register_submitted_callback(self.on_action_confirm)
+        btn_action_cancel = self.ln_actions_dialog.find_node('Cancel').get_content()
+        btn_action_cancel.register_pressed_callback(self.on_action_cancel)
+        btn_action_confirm = self.ln_actions_dialog.find_node('Confirm').get_content()
+        btn_action_confirm.register_pressed_callback(self.on_action_confirm)
 
         # sort order
         for sort in ['Name', 'Size', 'Date Added']:
@@ -95,9 +123,6 @@ class VaultMenu:
         self.sort_btn = btn
         btn.selected = True
         btn.icon.active = True
-
-        self.sort_by = 'name'
-        self.sort_order = 1
 
         # unlock components
         self.ln_unlock = root.find_node('UnlockFolder')
@@ -112,15 +137,9 @@ class VaultMenu:
         self.btn_unlock_continue = root.find_node('UnlockContinue').get_content()
         self.btn_unlock_continue.register_pressed_callback(self.open_locked_folder)
 
-        self.locked_folders = []
-        self.locked_path = None
-        self.folder_key = None
-        self.folder_to_unlock = None
-
         # upload components
         self.ln_upload = root.find_node('FileUpload')
 
-        self.btn_upload_selected = None
         btn_workspace = root.find_node('UploadTypeWorkspace').get_content()
         btn_workspace.name = 'workspace'
         btn_workspace.register_pressed_callback(self.select_upload_type)
@@ -157,14 +176,37 @@ class VaultMenu:
         btn_confirm = root.find_node('UploadConfirmButton').get_content()
         btn_confirm.register_pressed_callback(self.confirm_upload)
 
-        self.upload_item = None
-        self.upload_name = None
-        self.upload_ext = None
+    def open_for_integration(self, request):
+        self.pending_integration = request
+        self.ln_main_controls.enabled = False
+        self.ln_integration_controls.enabled = True
+        self.show_menu()
 
     def show_menu(self):
+        if self.pending_integration:
+            self.lbl_instr.text_value = 'Choose where to save your file'
+        else:
+            self.lbl_instr.text_value = f'Visit {self.address} in browser to add files'
+
+        self.update()
         self.menu.enabled = True
         self.plugin.update_menu(self.menu)
-        self.update()
+
+    def integration_cancel(self, button=None):
+        self.pending_integration.send_response(False)
+        self.integration_complete()
+
+    def integration_save(self, button=None):
+        (_, filename, data) = self.pending_integration.get_args()
+        r = self.plugin.vault.add_file(self.path, filename, data, self.folder_key)
+        self.pending_integration.send_response(r.ok)
+        self.integration_complete()
+
+    def integration_complete(self):
+        self.pending_integration = None
+        self.ln_main_controls.enabled = True
+        self.ln_integration_controls.enabled = False
+        self.show_menu()
 
     def update(self):
         self.selected_items.clear()
@@ -257,7 +299,16 @@ class VaultMenu:
 
         self.plugin.update_content(self.lst_actions)
 
-    def update_select_button(self):
+    def update_controls(self):
+        # update integration save button
+        if self.pending_integration:
+            self.btn_integration_save.unusable = self.path == '.'
+            self.plugin.update_content(self.btn_integration_save)
+            return
+
+        self.update_actions()
+
+        # update select/deselect all button
         num_files = sum(1 for i in self.lst_files.items if not i.is_folder)
         self.btn_select.unusable = num_files == 0
 
@@ -265,18 +316,13 @@ class VaultMenu:
         self.btn_select.text.value.set_all(btn_text)
         self.plugin.update_content(self.btn_select)
 
-    def update_load_button(self):
+        # update load button
         n = len(self.selected_items)
         items_text = f' {n} item{"s" if n > 1 else ""}' if n > 0 else ''
 
         self.btn_load.unusable = n == 0
         self.btn_load.text.value.set_all('Load' + items_text)
         self.plugin.update_content(self.btn_load)
-
-    def update_controls(self):
-        self.update_actions()
-        self.update_select_button()
-        self.update_load_button()
 
     def add_item(self, item, is_folder):
         name = item['name']
@@ -289,16 +335,19 @@ class VaultMenu:
         btn.item_name = name
 
         display_name = name.replace(self.plugin.account, 'account')
-        lbl = new_item.find_node('LabelNode').get_content()
-        lbl.text_value = display_name
-
         if is_folder:
-            lbl.text_value += '/'
+            display_name += '/'
+        btn.text.value.set_all(display_name)
+
+        if self.pending_integration and not is_folder:
+            btn.unusable = True
 
         if self.sort_by != 'name':
             info = item['size_text' if self.sort_by == 'size' else 'created_text']
             lbl_info = new_item.find_node('InfoNode').get_content()
             lbl_info.text_value = info
+        else:
+            new_item.find_node('InfoNode').enabled = False
 
         if is_folder and name in self.locked_folders:
             btn.icon.active = True
@@ -395,23 +444,23 @@ class VaultMenu:
             self.toggle_upload()
             self.toggle_actions()
         elif button.name == 'New Folder':
-            self.prompt_action('New Folder', 'Please provide a name:', True, 'new folder')
+            self.action_prompt('New Folder', 'Please provide a name:', True, 'new folder')
         elif button.name == 'Rename':
             name = self.selected_items[0].item_name
             desc = f'Rename "{name}" to:'
-            self.prompt_action('Rename', desc, True, name.rsplit('.', 1)[0])
+            self.action_prompt('Rename', desc, True, name.rsplit('.', 1)[0])
         elif button.name == 'Delete':
             n = len(self.selected_items)
             desc = f'Are you sure you want to delete {n} file{"s" if n > 1 else ""}?'
-            self.prompt_action('Delete', desc)
+            self.action_prompt('Delete', desc)
         elif button.name == 'Rename Folder':
             folder = self.path.split('/')[-1]
             desc = f'Rename "{folder}" to:'
-            self.prompt_action('Rename Folder', desc, True, folder)
+            self.action_prompt('Rename Folder', desc, True, folder)
         elif button.name == 'Delete Folder':
-            self.prompt_action('Delete Folder', 'Are you sure you want to delete this folder?')
+            self.action_prompt('Delete Folder', 'Are you sure you want to delete this folder?')
 
-    def prompt_action(self, title, description, show_input=False, input_default=''):
+    def action_prompt(self, title, description, show_input=False, input_default=''):
         self.pending_action = title
         self.ln_actions_list.enabled = False
         self.ln_actions_dialog.enabled = True
@@ -424,12 +473,12 @@ class VaultMenu:
 
         self.plugin.update_node(self.ln_actions_panel)
 
-    def on_cancel_action(self, button):
+    def on_action_cancel(self, button):
         self.ln_actions_list.enabled = True
         self.ln_actions_dialog.enabled = False
         self.plugin.update_node(self.ln_actions_panel)
 
-    def on_confirm_action(self, button):
+    def on_action_confirm(self, button):
         inp_text = self.ln_actions_dialog.find_node('Input').get_content().input_text
         key = self.folder_key
 
@@ -602,9 +651,8 @@ class VaultMenu:
         self.lst_upload.items = []
         for macro in macros:
             item = self.pfb_list_item.clone()
-            lbl = item.find_node('LabelNode').get_content()
-            lbl.text_value = macro.title
             btn = item.find_node('ButtonNode').get_content()
+            btn.text.value.set_all(macro.title)
             btn.macro = macro
             btn.register_pressed_callback(select_macro)
             self.lst_upload.items.append(item)
@@ -627,9 +675,8 @@ class VaultMenu:
         self.lst_upload.items = []
         for complex in complexes:
             item = self.pfb_list_item.clone()
-            lbl = item.find_node('LabelNode').get_content()
-            lbl.text_value = complex.full_name
             btn = item.find_node('ButtonNode').get_content()
+            btn.text.value.set_all(complex.full_name)
             btn.complex = complex
             btn.register_pressed_callback(select_complex)
             self.lst_upload.items.append(item)
