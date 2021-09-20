@@ -149,7 +149,10 @@ class Vault(nanome.AsyncPluginInstance):
             s.close()
 
         if port != DEFAULT_WEB_PORT:
-            url += ':' + str(port)
+            if port == 443:
+                url = 'https://' + url
+            else:
+                url += ':' + str(port)
         return url
 
 def main():
