@@ -25,7 +25,7 @@ express.response.error = function (error, statusCode) {
 app.use(require('morgan')('dev')) // logging
 app.use(require('helmet')({ contentSecurityPolicy: false }))
 app.use(require('compression')())
-app.use(formidable({ multiples: true }))
+app.use(formidable({ multiples: true, maxFileSize: 1024 ** 3 }))
 app.use(require('./router'))
 
 // error handling
