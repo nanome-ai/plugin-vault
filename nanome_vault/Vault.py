@@ -12,6 +12,7 @@ from .VaultManager import VaultManager
 from . import Workspace
 
 DEFAULT_WEB_PORT = 80
+HTTPS_PORT = 443
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Browse']
 
 # Plugin instance (for Nanome)
@@ -149,7 +150,7 @@ class Vault(nanome.AsyncPluginInstance):
             s.close()
 
         if port != DEFAULT_WEB_PORT:
-            if port == 443:
+            if port == HTTPS_PORT:
                 url = 'https://' + url
             else:
                 url += ':' + str(port)
@@ -176,7 +177,7 @@ def main():
         pass
 
     if port is None:
-        port = 443 if https else DEFAULT_WEB_PORT
+        port = HTTPS_PORT if https else DEFAULT_WEB_PORT
 
     # Plugin
     integrations = [
