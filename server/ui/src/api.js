@@ -159,16 +159,42 @@ const API = {
     folder.locked = data.locked
     folder.folders = data.folders
     folder.files = data.files.map(f => {
-      const [full, name, ext = ''] = /^(.+?)(?:\.(\w+))?$/.exec(f)
-      return { full, name, ext }
+      const [full, name, ext = ''] = /^(.+?)(?:\.(\w+))?$/.exec(f.name)
+      return { full, name, ext, size_text: f.size_text }
     })
 
     return folder
   },
 
-  upload(path, files) {
+  upload(path, files, onProgress) {
     if (!files || !files.length) return
-    return sendCommand(path, 'upload', { files })
+
+    const data = new FormData()
+    data.append('command', 'upload')
+    data.append('key', API.keys.get(path))
+    for (const file of files) {
+      data.append('files', file)
+    }
+
+    path = replaceAccount(path)
+    const headers = {}
+    if (store.state.token) {
+      headers['Authorization'] = 'Bearer ' + store.state.token
+    }
+
+    return new Promise(resolve => {
+      const request = new XMLHttpRequest()
+      request.open('POST', '/files' + path, true)
+      request.upload.addEventListener('progress', onProgress)
+
+      request.addEventListener('load', () => {
+        const json = JSON.parse(request.responseText)
+        json.code = request.status
+        resolve(json)
+      })
+
+      request.send(data)
+    })
   },
 
   delete(path) {

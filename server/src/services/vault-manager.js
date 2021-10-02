@@ -1,8 +1,12 @@
 const fs = require('fs-extra')
+const moment = require('moment')
 const os = require('os')
 const ospath = require('path')
 const walk = require('@nodelib/fs.walk')
+
 const aes = require('./aes-cipher')
+const config = require('@/config')
+const du = require('@/utils/du')
 const { HTTPError } = require('@/utils/error')
 
 // walk settings to find all files not starting with '.'
@@ -27,13 +31,21 @@ exports.FILES_DIR = FILES_DIR
 
 // add data to vault at path/filename, where filename can contain a path
 exports.addFile = (path, filename, data, key) => {
-  path = exports.getVaultPath(path, false)
+  const match = /^(user-[0-9a-f]{8})/.exec(path)
+  if (match && config.USER_STORAGE) {
+    const userPath = exports.getVaultPath(match[1], false)
+    if (du(userPath) + data.length > config.USER_STORAGE) {
+      const msg = `User storage exceeded (max ${config.USER_STORAGE_MSG})`
+      throw new HTTPError(413, msg)
+    }
+  }
 
   if (key !== undefined) {
     data = aes.encrypt(data, key)
   }
 
   // create folder paths
+  path = exports.getVaultPath(path, false)
   const subFolder = ospath.join(path, ospath.dirname(filename))
   fs.ensureDirSync(subFolder)
 
@@ -212,7 +224,13 @@ exports.listPath = path => {
 
   // return only 'shared' folder for root
   if (path === FILES_DIR) {
-    result.folders.push('shared')
+    result.folders.push({
+      name: 'shared',
+      size: '',
+      size_text: '',
+      created: '',
+      created_text: ''
+    })
     return result
   }
 
@@ -223,8 +241,25 @@ exports.listPath = path => {
 
   for (const item of items) {
     const itemPath = ospath.join(path, item)
-    const isDir = fs.lstatSync(itemPath).isDirectory()
-    result[isDir ? 'folders' : 'files'].push(item)
+    const stats = fs.statSync(itemPath)
+    const isDir = stats.isDirectory()
+
+    const bytes = isDir ? du(itemPath) : stats.size
+    const power = bytes && Math.floor(Math.log(bytes) / Math.log(1024))
+    const unit = ['B', 'KB', 'MB', 'GB'][power]
+    const size = `${(bytes / 1024 ** power).toFixed(1)}${unit}`
+
+    // using mtime for created because ctime not accurate
+    result[isDir ? 'folders' : 'files'].push({
+      name: item,
+      size: bytes,
+      size_text: size,
+      created: stats.mtime
+        .toISOString()
+        .replace('T', ' ')
+        .replace(/:[^:]+$/, ''),
+      created_text: moment(stats.mtime).fromNow()
+    })
 
     const lockPath = ospath.join(itemPath, '.locked')
     if (isDir && fs.existsSync(lockPath)) {

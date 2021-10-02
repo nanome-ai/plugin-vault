@@ -23,6 +23,14 @@
       <div class="text-4xl">
         <template v-if="isUploading">
           Uploading {{ isConverting ? 'and converting' : '' }} files...
+          <div class="relative pt1">
+            <div class="overflow-hidden h-2 mb-4 rounded bg-gray-400">
+              <div
+                :style="{ width: `${100 * uploadProgress}%` }"
+                class="h-full bg-blue-500"
+              ></div>
+            </div>
+          </div>
         </template>
         <template v-else-if="!numDropping">
           Drop items or
@@ -61,7 +69,8 @@ export default {
     isConverting: false,
     isUploading: false,
     numDropping: 0,
-    numEvents: 0
+    numEvents: 0,
+    uploadProgress: 0
   }),
 
   computed: {
@@ -81,9 +90,8 @@ export default {
 
   methods: {
     onDragEnter(e) {
-      const { types } = e.dataTransfer
       this.numEvents++
-      this.numDropping = types.filter(t => t === 'Files').length
+      this.numDropping = e.dataTransfer.items.length
       this.showDropzone = true
     },
 
@@ -106,6 +114,10 @@ export default {
       await this.upload(files)
       e.target.value = null
       this.numDropping = 0
+    },
+
+    onProgress(e) {
+      this.uploadProgress = e.loaded / e.total
     },
 
     async upload(files) {
@@ -141,15 +153,14 @@ export default {
 
       if (upload.length && confirmUpload) {
         const path = this.path === '/' ? '/shared/' : this.path
-        const res = await API.upload(path, upload)
+        const res = await API.upload(path, upload, this.onProgress)
 
         if (res.code !== 200) {
           this.$modal.alert({
             title: 'Upload Failed',
-            body: res.error
+            body: res.error.message
           })
         } else {
-          this.$emit('upload')
           if (res.failed) {
             const list = res.failed.join('<br>')
             this.$modal.alert({
@@ -161,6 +172,7 @@ export default {
             this.$router.push(path)
           }
         }
+        this.$emit('upload')
       }
 
       this.isConverting = false

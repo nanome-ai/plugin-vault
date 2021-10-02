@@ -28,23 +28,23 @@ class VaultManager:
 
     # add data to vault at path/filename, where filename can contain a path
     def add_file(self, path, filename, data, key=None):
-        self.command('upload', path, {'key': key}, {'files': (filename, data)})
+        return self.command('upload', path, {'key': key}, {'files': (filename, data)})
 
     # creates a path and returns True. returns False if path exists
-    def create_path(self, path):
-        self.command('create', path)
+    def create_path(self, path, key=None):
+        return self.command('create', path, {'key': key})
 
     # decrypts full contents of path, return False if key invalid
     def decrypt_folder(self, path, key):
-        self.command('decrypt', path, {'key': key})
+        return self.command('decrypt', path, {'key': key})
 
     # deletes a path and returns True on success, False on error
     def delete_path(self, path, key=None):
-        self.command('delete', path, {'key': key})
+        return self.command('delete', path, {'key': key})
 
     # encrypts full contents of path, return False if encrypted subfolder exists
     def encrypt_folder(self, path, key):
-        self.command('encrypt', path, {'key': key})
+        return self.command('encrypt', path, {'key': key})
 
     # get supported file extensions
     def get_extensions(self, ):
@@ -68,5 +68,5 @@ class VaultManager:
         return r.json()
 
     # renames a file/folder at path and returns True on success, False on error
-    def rename_path(self, path, name):
-        self.command('rename', path, {'name': name})
+    def rename_path(self, path, name, key=None):
+        return self.command('rename', path, {'name': name, 'key': key})

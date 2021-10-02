@@ -12,14 +12,15 @@ from .VaultManager import VaultManager
 from . import Workspace
 
 DEFAULT_WEB_PORT = 80
-EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures']
+HTTPS_PORT = 443
+EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Browse']
 
 # Plugin instance (for Nanome)
 class Vault(nanome.AsyncPluginInstance):
     def start(self):
         self.integration.import_file = lambda _: self.on_run()
         self.integration.export_locations = lambda req: req.send_response(EXPORT_LOCATIONS)
-        self.integration.export_file = self.on_export_file
+        self.integration.export_file = self.on_export_integration
 
         self.set_plugin_list_button(self.PluginListButtonType.run, 'Open')
 
@@ -37,12 +38,16 @@ class Vault(nanome.AsyncPluginInstance):
         self.menu.show_menu()
 
     @async_callback
-    async def on_export_file(self, request):
+    async def on_export_integration(self, request):
         await self.on_presenter_change()
         (location, filename, data) = request.get_args()
-        path = os.path.join(self.account, location)
-        self.vault.add_file(path, filename, data)
-        request.send_response(True)
+
+        if location == 'Browse':
+            self.menu.open_for_integration(request)
+        else:
+            path = os.path.join(self.account, location)
+            r = self.vault.add_file(path, filename, data)
+            request.send_response(r.ok)
 
     @async_callback
     async def on_presenter_change(self):
@@ -121,8 +126,11 @@ class Vault(nanome.AsyncPluginInstance):
             key = self.menu.folder_key
             file_name = f'{name}.{extension}'
 
-            self.vault.add_file(path, file_name, f.read(), key)
-            self.send_notification(NotificationTypes.success, f'"{file_name}" saved')
+            r = self.vault.add_file(path, file_name, f.read(), key)
+            if r.ok:
+                self.send_notification(NotificationTypes.success, f'"{file_name}" saved')
+            else:
+                self.send_notification(NotificationTypes.error, r.json()['error']['message'])
 
         temp.close() # unsure if needed
         os.remove(temp.name)
@@ -142,7 +150,10 @@ class Vault(nanome.AsyncPluginInstance):
             s.close()
 
         if port != DEFAULT_WEB_PORT:
-            url += ':' + str(port)
+            if port == HTTPS_PORT:
+                url = 'https://' + url
+            else:
+                url += ':' + str(port)
         return url
 
 def main():
@@ -166,7 +177,7 @@ def main():
         pass
 
     if port is None:
-        port = 443 if https else DEFAULT_WEB_PORT
+        port = HTTPS_PORT if https else DEFAULT_WEB_PORT
 
     # Plugin
     integrations = [

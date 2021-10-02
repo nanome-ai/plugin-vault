@@ -31,14 +31,17 @@ async function traverseDir(item, path = '') {
 }
 
 export async function getFiles(event) {
-  const tree = []
-  const items = event.dataTransfer.items
-  for (const item of items) {
+  const entries = []
+  for (const item of event.dataTransfer.items) {
     const entry = item.webkitGetAsEntry()
-    if (entry) {
-      const list = await traverseDir(entry)
-      tree.push(...list)
-    }
+    if (entry) entries.push(entry)
   }
+
+  const tree = []
+  for (const entry of entries) {
+    const list = await traverseDir(entry)
+    tree.push(...list)
+  }
+
   return tree.flat(Infinity)
 }
