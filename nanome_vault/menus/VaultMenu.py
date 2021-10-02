@@ -700,7 +700,7 @@ class VaultMenu:
         self.ln_upload_message.enabled = True
 
         if message is None:
-            self.lbl_upload_message.text_value = 'select an item to upload'
+            self.lbl_upload_message.text_value = 'select an item above to upload'
             return
 
         self.lbl_upload_message.text_value = message
