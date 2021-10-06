@@ -158,21 +158,31 @@ class Vault(nanome.AsyncPluginInstance):
 
 
 def create_parser():
-    """Create command line parser For Plugin.
+    """Create command line parser For Vault Plugin.
 
     rtype: argsparser: args parser
     """
     parser = argparse.ArgumentParser(description='Parse Arguments to set up Vault Plugin and related Services.')
-    parser.add_argument('--api-key', dest='api_key', help='Key for connecting to Vault Manager API', required=False)
-    parser.add_argument('-s', '--https', '--ssl-cert', dest='https', action='store_true', help='connect to Vault Server via HTTPS')
-    parser.add_argument('-u', '--url', dest='url', type=str, help='Url pointing to Vault Server.')
-    parser.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Server.', required=False)
+    plugin_group = parser.add_argument_group('Base Arguments')
+    vault_group = parser.add_argument_group('Vault Arguments')
+
+    # Add arguments from shared Plugin argparser, so that --help will show all possible arguments you can pass.
+    base_parser = nanome.Plugin.create_parser()
+    for action in base_parser._actions:
+        if action.dest == 'help':
+            continue
+        plugin_group._add_action(action)
+
+    # Add Vault specific arguments
+    vault_group.add_argument('--api-key', dest='api_key', help='Key for connecting to Vault Manager API', required=False)
+    vault_group.add_argument('-s', '--https', '--ssl-cert', dest='https', action='store_true', help='connect to Vault Server via HTTPS')
+    vault_group.add_argument('-u', '--url', dest='url', type=str, help='Url pointing to Vault Server.')
+    vault_group.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Server.', required=False)
     return parser
 
 
 def main():
     # Plugin server (for Web)
-
     parser = create_parser()
     args, _ = parser.parse_known_args()
     
