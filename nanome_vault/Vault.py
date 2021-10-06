@@ -1,4 +1,4 @@
-import sys
+import argparse
 import os
 import socket
 import tempfile
@@ -156,25 +156,31 @@ class Vault(nanome.AsyncPluginInstance):
                 url += ':' + str(port)
         return url
 
+
+def create_parser():
+    """Create command line parser For Plugin.
+
+    rtype: argsparser: args parser
+    """
+    parser = argparse.ArgumentParser(description='Parse Arguments to set up Vault Plugin and related Services.')
+    parser.add_argument('--api-key', dest='api_key', help='Key for connecting to Vault Manager API', required=False)
+    parser.add_argument('-s', '--https', '--ssl-cert', dest='https', action='store_true', help='connect to Vault Server via HTTPS')
+    parser.add_argument('-u', '--url', dest='url', type=str, help='Url pointing to Vault Server.')
+    parser.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Server.', required=False)
+    return parser
+
+
 def main():
     # Plugin server (for Web)
-    api_key = None
-    https = False
-    url = None
-    port = None
 
-    try:
-        for i, arg in enumerate(sys.argv):
-            if arg == '--api-key':
-                api_key = sys.argv[i + 1]
-            elif arg in ['--https', '-s', '--ssl-cert']:
-                https = True
-            elif arg in ['-u', '--url']:
-                url = sys.argv[i + 1]
-            elif arg in ['-w', '--web-port']:
-                port = int(sys.argv[i + 1])
-    except:
-        pass
+    parser = create_parser()
+    args, _ = parser.parse_known_args()
+    
+    # args = None
+    https = args.https
+    url = args.url
+    port = args.web_port
+    api_key = args.api_key
 
     if port is None:
         port = HTTPS_PORT if https else DEFAULT_WEB_PORT
