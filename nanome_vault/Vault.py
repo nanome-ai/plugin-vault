@@ -28,8 +28,11 @@ class Vault(nanome.AsyncPluginInstance):
         nanome.api.macro.Macro.set_plugin_identifier('')
 
         self.account = 'user-00000000'
-        self.menu = VaultMenu(self, self.get_server_url())
-        self.vault = VaultManager(self.custom_data[2])
+        server_url = self.custom_data[0]
+        api_key = self.custom_data[2]
+
+        self.menu = VaultMenu(self, server_url)
+        self.vault = VaultManager(api_key)
         self.extensions = self.vault.get_extensions()
 
     def on_run(self):
@@ -135,28 +138,6 @@ class Vault(nanome.AsyncPluginInstance):
         temp.close() # unsure if needed
         os.remove(temp.name)
 
-    def get_server_url(self):
-        url, port, _ = self.custom_data
-        if url is not None:
-            return url
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            s.connect(('10.255.255.255', 1))
-            url = s.getsockname()[0]
-        except:
-            url = '127.0.0.1'
-        finally:
-            s.close()
-
-        if port != DEFAULT_WEB_PORT:
-            if port == HTTPS_PORT:
-                url = 'https://' + url
-            else:
-                url += ':' + str(port)
-        return url
-
-
 def create_parser():
     """Create command line parser For Vault Plugin.
 
@@ -181,19 +162,37 @@ def create_parser():
     return parser
 
 
+def get_default_url(port, https=False):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)    
+    preferred_address = '10.255.255.255'
+    secondary_address = 'localhost'
+    try:
+        s.connect((preferred_address, 1))
+        url = s.getsockname()[0]
+    except:
+        url = secondary_address
+    finally:
+        s.close()
+
+    if https:
+        url = 'https://' + url
+    else:
+        url += ':' + str(port)
+    return url
+
+
 def main():
     # Plugin server (for Web)
     parser = create_parser()
     args, _ = parser.parse_known_args()
     
-    # args = None
-    https = args.https
-    url = args.url
-    port = args.web_port
     api_key = args.api_key
-
+    https = args.https
+    port = args.web_port
     if port is None:
         port = HTTPS_PORT if https else DEFAULT_WEB_PORT
+
+    url = args.url or get_default_url(port, https)
 
     # Plugin
     integrations = [
