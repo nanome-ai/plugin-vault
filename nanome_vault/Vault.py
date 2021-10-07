@@ -155,7 +155,7 @@ def create_parser():
         plugin_group._add_action(action)
 
     # Add Vault specific arguments
-    vault_group.add_argument('--api-key', dest='api_key', help='Key for connecting to Vault Manager API', required=False)
+    vault_group.add_argument('--api-key', dest='api_key', help=argparse.SUPPRESS, required=False)
     vault_group.add_argument('-s', '--https', '--ssl-cert', dest='https', action='store_true', help='Enable HTTPS on the Vault Web UI')
     vault_group.add_argument('-u', '--url', dest='url', type=str, help='Vault Web UI URL. If omitted, IP address will be shown in plugin menu.')
     vault_group.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Web UI.', required=False)
