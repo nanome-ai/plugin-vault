@@ -1,4 +1,4 @@
-import sys
+import argparse
 import os
 import socket
 import tempfile
@@ -28,8 +28,11 @@ class Vault(nanome.AsyncPluginInstance):
         nanome.api.macro.Macro.set_plugin_identifier('')
 
         self.account = 'user-00000000'
-        self.menu = VaultMenu(self, self.get_server_url())
-        self.vault = VaultManager(self.custom_data[2])
+        server_url = self.custom_data[0]
+        api_key = self.custom_data[2]
+
+        self.menu = VaultMenu(self, server_url)
+        self.vault = VaultManager(api_key)
         self.extensions = self.vault.get_extensions()
 
     def on_run(self):
@@ -135,49 +138,61 @@ class Vault(nanome.AsyncPluginInstance):
         temp.close() # unsure if needed
         os.remove(temp.name)
 
-    def get_server_url(self):
-        url, port, _ = self.custom_data
-        if url is not None:
-            return url
+def create_parser():
+    """Create command line parser For Vault Plugin.
 
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            s.connect(('10.255.255.255', 1))
-            url = s.getsockname()[0]
-        except:
-            url = '127.0.0.1'
-        finally:
-            s.close()
+    rtype: argsparser: args parser
+    """
+    parser = argparse.ArgumentParser(description='Parse Arguments to set up Vault Plugin and related Services.')
+    plugin_group = parser.add_argument_group('Base Arguments')
+    vault_group = parser.add_argument_group('Vault Arguments')
 
-        if port != DEFAULT_WEB_PORT:
-            if port == HTTPS_PORT:
-                url = 'https://' + url
-            else:
-                url += ':' + str(port)
-        return url
+    # Add arguments from shared Plugin argparser, so that --help will show all possible arguments you can pass.
+    base_parser = nanome.Plugin.create_parser()
+    for action in base_parser._actions:
+        if action.dest == 'help':
+            continue
+        plugin_group._add_action(action)
+
+    # Add Vault specific arguments
+    vault_group.add_argument('--api-key', dest='api_key', help=argparse.SUPPRESS, required=False)
+    vault_group.add_argument('-s', '--https', '--ssl-cert', dest='https', action='store_true', help='Enable HTTPS on the Vault Web UI')
+    vault_group.add_argument('-u', '--url', dest='url', type=str, help='Vault Web UI URL. If omitted, IP address will be shown in plugin menu.')
+    vault_group.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Web UI.', required=False)
+    return parser
+
+
+def get_default_url(port, https=False):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)    
+    preferred_address = '10.255.255.255'
+    secondary_address = 'localhost'
+    try:
+        s.connect((preferred_address, 1))
+        url = s.getsockname()[0]
+    except:
+        url = secondary_address
+    finally:
+        s.close()
+
+    if https:
+        url = 'https://' + url
+    else:
+        url += ':' + str(port)
+    return url
+
 
 def main():
     # Plugin server (for Web)
-    api_key = None
-    https = False
-    url = None
-    port = None
-
-    try:
-        for i, arg in enumerate(sys.argv):
-            if arg == '--api-key':
-                api_key = sys.argv[i + 1]
-            elif arg in ['--https', '-s', '--ssl-cert']:
-                https = True
-            elif arg in ['-u', '--url']:
-                url = sys.argv[i + 1]
-            elif arg in ['-w', '--web-port']:
-                port = int(sys.argv[i + 1])
-    except:
-        pass
-
+    parser = create_parser()
+    args, _ = parser.parse_known_args()
+    
+    api_key = args.api_key
+    https = args.https
+    port = args.web_port
     if port is None:
         port = HTTPS_PORT if https else DEFAULT_WEB_PORT
+
+    url = args.url or get_default_url(port, https)
 
     # Plugin
     integrations = [
