@@ -39,6 +39,24 @@
     </template>
 
     <template v-if="path == '/'">
+      <router-link
+        v-if="$store.state.org"
+        to="/org/"
+        @contextmenu.native.prevent="contextmenu($event, 'org/')"
+        event="dblclick"
+        class="cursor-default"
+      >
+        <fa-layers class="icon">
+          <fa-icon icon="folder" />
+          <fa-icon
+            icon="sitemap"
+            class="text-white"
+            transform="down-1 left-2 shrink-11"
+          />
+        </fa-layers>
+        <div>org</div>
+      </router-link>
+
       <a v-if="!$store.state.unique" @dblclick="$modal.login()">
         <fa-layers class="icon">
           <fa-icon icon="folder" />

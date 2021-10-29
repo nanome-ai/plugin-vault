@@ -9,6 +9,7 @@ const state = {
   token: localStorage.getItem('user-token') || null,
   unique: null,
   name: null,
+  org: null,
   extensions: {
     supported: [],
     extras: [],
@@ -39,14 +40,21 @@ async function saveSession(commit, { success, results }) {
     const user = {
       unique: results.user.unique,
       name: results.user.name,
-      token: results.token.value
+      token: results.token.value,
+      org: results.organization && `org-${results.organization.id}`
     }
     commit('PATCH_USER', user)
     localStorage.setItem('user-token', results.token.value)
 
     try {
-      await API.create('/' + results.user.unique)
+      await API.create('/' + user.unique)
     } catch (e) {}
+
+    if (user.org) {
+      try {
+        await API.create('/' + user.org)
+      } catch (e) {}
+    }
 
     return true
   } else {
@@ -75,7 +83,8 @@ const actions = {
     commit('PATCH_USER', {
       token: null,
       name: null,
-      unique: null
+      unique: null,
+      org: null
     })
     localStorage.removeItem('user-token')
   }

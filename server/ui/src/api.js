@@ -1,8 +1,10 @@
 import store from '@/store'
 const LOGIN_API = 'https://api.nanome.ai/user'
 
-function replaceAccount(path) {
-  return path.replace(/^\/account/, '/' + store.state.unique)
+function replacePath(path) {
+  return path
+    .replace(/^\/account($|\/)/, `/${store.state.unique}$1`)
+    .replace(/^\/org($|\/)/, `/${store.state.org}$1`)
 }
 
 function addSlash(path) {
@@ -25,7 +27,7 @@ function sendCommand(path, command, params = {}) {
   if (!params.key) {
     params.key = API.keys.get(path)
   }
-  path = replaceAccount(path)
+  path = replacePath(path)
 
   const data = new FormData()
   data.append('command', command)
@@ -105,7 +107,7 @@ const API = {
       options.headers['Authorization'] = 'Bearer ' + store.state.token
     }
 
-    path = replaceAccount(path)
+    path = replacePath(path)
     const blob = await fetch('/files' + path, options).then(res => res.blob())
 
     const a = document.createElement('a')
@@ -125,7 +127,7 @@ const API = {
       options.headers['Vault-Key'] = key
     }
 
-    path = replaceAccount(path)
+    path = replacePath(path)
     return request('/files' + path, options)
   },
 
@@ -176,7 +178,7 @@ const API = {
       data.append('files', file)
     }
 
-    path = replaceAccount(path)
+    path = replacePath(path)
     const headers = {}
     if (store.state.token) {
       headers['Authorization'] = 'Bearer ' + store.state.token

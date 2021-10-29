@@ -14,6 +14,9 @@ LIST_ITEM_PATH = os.path.join(BASE_DIR, 'json', 'list_item.json')
 UP_ICON_PATH = os.path.join(BASE_DIR, 'icons', 'up.png')
 LOCK_ICON_PATH = os.path.join(BASE_DIR, 'icons', 'lock.png')
 
+ACCOUNT_FOLDER = 'account'
+ORG_FOLDER = 'my org'
+
 class VaultMenu:
     def __init__(self, plugin, address):
         self.plugin = plugin
@@ -208,12 +211,28 @@ class VaultMenu:
         self.ln_integration_controls.enabled = False
         self.show_menu()
 
+    def replace_path(self, path):
+        path = path.replace(self.plugin.account, ACCOUNT_FOLDER)
+        if self.plugin.org is not None:
+            path = path.replace(self.plugin.org, ORG_FOLDER)
+        return path
+
     def update(self):
         self.selected_items.clear()
         items = self.plugin.vault.list_path(self.path + '/', self.folder_key)
         at_root = self.path == '.'
 
         if at_root:
+            org = self.plugin.org
+            if org is not None:
+                items['folders'].append({
+                    'name': org,
+                    'size': '',
+                    'size_text': '',
+                    'created': '',
+                    'created_text': '',
+                })
+
             account = self.plugin.account
             items['folders'].append({
                 'name': account,
@@ -237,7 +256,7 @@ class VaultMenu:
             parts.insert(2, '...')
         subpath = '/'.join(parts)
 
-        subpath = subpath.replace(self.plugin.account, 'account')
+        subpath = self.replace_path(subpath)
         path = '/ ' + subpath.replace('/', ' / ')
 
         self.lbl_crumbs.text_value = path
@@ -287,7 +306,7 @@ class VaultMenu:
             self.lst_actions.items.append(make_action('Upload Here'))
             self.lst_actions.items.append(make_action('New Folder'))
 
-            if self.path not in [self.plugin.account, 'shared']:
+            if self.path not in [self.plugin.account, self.plugin.org, 'shared']:
                 self.lst_actions.items.append(make_action('Rename Folder'))
                 self.lst_actions.items.append(make_action('Delete Folder'))
 
@@ -334,7 +353,7 @@ class VaultMenu:
         btn = ln_btn.get_content()
         btn.item_name = name
 
-        display_name = name.replace(self.plugin.account, 'account')
+        display_name = self.replace_path(name)
         if is_folder:
             display_name += '/'
         btn.text.value.set_all(display_name)
@@ -436,7 +455,7 @@ class VaultMenu:
 
     def on_action_pressed(self, button):
         if button.name == 'Open Website':
-            path = self.path.replace(self.plugin.account, 'account')
+            path = self.replace_path(self.path)
             url = urllib.parse.quote(f'{self.address}/{path}')
             self.plugin.open_url(url)
             self.toggle_actions()

@@ -28,6 +28,8 @@ class Vault(nanome.AsyncPluginInstance):
         nanome.api.macro.Macro.set_plugin_identifier('')
 
         self.account = 'user-00000000'
+        self.org = None
+
         server_url = self.custom_data[0]
         api_key = self.custom_data[2]
 
@@ -59,13 +61,21 @@ class Vault(nanome.AsyncPluginInstance):
             return
 
         in_account = self.account in self.menu.path
+        in_org = self.org and self.org in self.menu.path
+
         self.account = info.account_id
         self.vault.create_path(self.account)
+
+        if info.has_org:
+            self.org = f'org-{info.org_id}'
+            self.vault.create_path(self.org)
+        else:
+            self.org = None
 
         if not self.menu.menu.enabled:
             return
 
-        if in_account:
+        if in_account or in_org:
             self.menu.path = '.'
             self.menu.open_folder('.')
         else:
@@ -163,7 +173,7 @@ def create_parser():
 
 
 def get_default_url(port, https=False):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)    
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     preferred_address = '10.255.255.255'
     secondary_address = 'localhost'
     try:
@@ -185,7 +195,7 @@ def main():
     # Plugin server (for Web)
     parser = create_parser()
     args, _ = parser.parse_known_args()
-    
+
     api_key = args.api_key
     https = args.https
     port = args.web_port

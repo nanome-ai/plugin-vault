@@ -26,6 +26,7 @@ import {
   faPlus,
   faSadTear,
   faSearch,
+  faSitemap,
   faSyncAlt,
   faTh,
   faTrash
@@ -46,6 +47,7 @@ library.add({
   faPlus,
   faSadTear,
   faSearch,
+  faSitemap,
   faSyncAlt,
   faTh,
   faTrash
