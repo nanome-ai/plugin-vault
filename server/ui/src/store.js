@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import API from '@/api'
+import router from '@/router'
 
 Vue.use(Vuex)
 
@@ -46,19 +47,16 @@ async function saveSession(commit, { success, results }) {
     commit('PATCH_USER', user)
     localStorage.setItem('user-token', results.token.value)
 
-    try {
-      await API.create('/' + user.unique)
-    } catch (e) {}
+    await API.create('/' + user.unique).catch(e => {})
 
     if (user.org) {
-      try {
-        await API.create('/' + user.org)
-      } catch (e) {}
+      await API.create('/' + user.org).catch(e => {})
     }
 
     return true
   } else {
     localStorage.removeItem('user-token')
+    commit('PATCH_USER', { token: null })
     return false
   }
 }
@@ -87,6 +85,7 @@ const actions = {
       org: null
     })
     localStorage.removeItem('user-token')
+    router.push('/')
   }
 }
 
