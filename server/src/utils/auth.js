@@ -6,13 +6,20 @@ const { HTTPError } = require('./error')
 const CACHE = {}
 
 module.exports = async (req, res, next) => {
-  if (!config.ENABLE_AUTH) return next()
-
   const apiKey = req.headers['vault-api-key']
   if (apiKey && apiKey === config.API_KEY) return next()
 
+  // path after /files/
+  const path = req.path.slice(7)
+  const userMatch = /^user-[0-9a-f]{8}/.exec(path)
+  const orgMatch = /^org-\d+/.exec(path)
+
   const auth = req.headers.authorization
-  if (!auth) return next(HTTPError.UNAUTHORIZED)
+  if (!auth) {
+    if (config.ENABLE_AUTH || userMatch || orgMatch) {
+      return next(HTTPError.UNAUTHORIZED)
+    } else return next()
+  }
 
   const token = auth.split(' ').pop()
   let cached = CACHE[token]
@@ -24,17 +31,22 @@ module.exports = async (req, res, next) => {
       .catch(() => ({ success: false }))
 
     if (!res.success) return next(HTTPError.UNAUTHORIZED)
-    cached = { user: res.results.user.unique }
+    cached = {
+      user: res.results.user.unique,
+      org: res.results.organization && `org-${res.results.organization.id}`
+    }
     CACHE[token] = cached
   }
 
   const user = cached.user
+  const org = cached.org
   cached.access = Date.now()
 
-  const path = req.path.slice(1)
-  const regex = /^user-[0-9a-f]{8}/
-  const match = regex.exec(path)
-  if (match && user !== match[0]) {
+  if (userMatch && user !== userMatch[0]) {
+    return next(HTTPError.UNAUTHORIZED)
+  }
+
+  if (orgMatch && org !== orgMatch[0]) {
     return next(HTTPError.UNAUTHORIZED)
   }
 
