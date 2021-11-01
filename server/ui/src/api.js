@@ -171,20 +171,19 @@ const API = {
 
     const data = new FormData()
     data.append('command', 'upload')
-    data.append('key', API.keys.get(path))
+
+    const key = API.keys.get(path)
+    if (key) {
+      data.append('key', key)
+    }
+
     for (const file of files) {
       data.append('files', file)
     }
 
-    path = replaceAccount(path)
-    const headers = {}
-    if (store.state.token) {
-      headers['Authorization'] = 'Bearer ' + store.state.token
-    }
-
     return new Promise(resolve => {
       const request = new XMLHttpRequest()
-      request.open('POST', '/files' + path, true)
+      request.open('POST', '/files' + replaceAccount(path), true)
       request.upload.addEventListener('progress', onProgress)
 
       request.addEventListener('load', () => {
@@ -193,6 +192,9 @@ const API = {
         resolve(json)
       })
 
+      if (store.state.token) {
+        request.setRequestHeader('Authorization', 'Bearer ' + store.state.token)
+      }
       request.send(data)
     })
   },
