@@ -173,7 +173,12 @@ const API = {
 
     const data = new FormData()
     data.append('command', 'upload')
-    data.append('key', API.keys.get(path))
+
+    const key = API.keys.get(path)
+    if (key) {
+      data.append('key', key)
+    }
+
     for (const file of files) {
       data.append('files', file)
     }
