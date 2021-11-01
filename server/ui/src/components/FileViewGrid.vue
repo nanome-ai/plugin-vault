@@ -41,8 +41,8 @@
     <template v-if="path == '/'">
       <router-link
         v-if="$store.state.org"
-        to="/org/"
-        @contextmenu.native.prevent="contextmenu($event, 'org/')"
+        to="/my-org/"
+        @contextmenu.native.prevent="contextmenu($event, 'my-org/')"
         event="dblclick"
         class="cursor-default"
       >
@@ -54,7 +54,7 @@
             transform="down-1 left-2 shrink-11"
           />
         </fa-layers>
-        <div>org</div>
+        <div>my org</div>
       </router-link>
 
       <a v-if="!$store.state.unique" @dblclick="$modal.login()">

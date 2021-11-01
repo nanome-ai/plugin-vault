@@ -4,7 +4,7 @@ const LOGIN_API = 'https://api.nanome.ai/user'
 function replacePath(path) {
   return path
     .replace(/^\/account($|\/)/, `/${store.state.unique}$1`)
-    .replace(/^\/org($|\/)/, `/${store.state.org}$1`)
+    .replace(/^\/my-org($|\/)/, `/${store.state.org}$1`)
 }
 
 function addSlash(path) {

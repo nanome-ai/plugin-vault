@@ -211,10 +211,11 @@ class VaultMenu:
         self.ln_integration_controls.enabled = False
         self.show_menu()
 
-    def replace_path(self, path):
+    def replace_path(self, path, is_url=False):
         path = path.replace(self.plugin.account, ACCOUNT_FOLDER)
         if self.plugin.org is not None:
-            path = path.replace(self.plugin.org, ORG_FOLDER)
+            org_folder = ORG_FOLDER.replace(' ', '-') if is_url else ORG_FOLDER
+            path = path.replace(self.plugin.org, org_folder)
         return path
 
     def update(self):
@@ -455,7 +456,7 @@ class VaultMenu:
 
     def on_action_pressed(self, button):
         if button.name == 'Open Website':
-            path = self.replace_path(self.path)
+            path = self.replace_path(self.path, True)
             url = urllib.parse.quote(f'{self.address}/{path}')
             self.plugin.open_url(url)
             self.toggle_actions()
