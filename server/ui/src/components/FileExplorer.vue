@@ -109,7 +109,8 @@ export default {
       const isFolder = path.slice(-1) === '/'
       const inAccount = path.slice(0, 8) === '/account'
       const canCreate = !component || (isFolder && !locked)
-      const canModify = component && !['/shared/', '/account/'].includes(path)
+      const canModify =
+        component && !['/shared/', '/my-org/', '/account/'].includes(path)
       const canEncrypt =
         !encrypted && !key_path && isFolder && canModify && !inAccount
 
