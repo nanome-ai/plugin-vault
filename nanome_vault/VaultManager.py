@@ -1,5 +1,7 @@
 import requests
 
+from nanome.util import Logs
+
 API = 'http://vault-server/'
 
 class VaultManager:
@@ -14,7 +16,9 @@ class VaultManager:
             data = {}
         data['command'] = command
         url = API + 'files/' + path
-        return requests.post(url, headers=headers, data=data, files=files)
+        r = requests.post(url, headers=headers, data=data, files=files)
+        Logs.message(r.url, r.status_code, r.content)
+        return r
 
     def get(self, path, key):
         headers = {}
@@ -23,7 +27,9 @@ class VaultManager:
         if key:
             headers['vault-key'] = key
         url = API + 'files/' + (path or '')
-        return requests.get(url, headers=headers)
+        r = requests.get(url, headers=headers)
+        Logs.message(r.url, r.status_code, r.content)
+        return r
 
 
     # add data to vault at path/filename, where filename can contain a path
@@ -49,6 +55,7 @@ class VaultManager:
     # get supported file extensions
     def get_extensions(self, ):
         r = requests.get(API + 'info')
+        Logs.message(r.url, r.status_code, r.content)
         return r.json()['extensions']
 
     # write decrypted file to out_put
