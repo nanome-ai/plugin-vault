@@ -9,6 +9,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-ENV NO_PROXY vault-server
-
 CMD python run.py ${ARGS}

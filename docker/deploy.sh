@@ -61,6 +61,7 @@ docker run -d \
 --name vault \
 --restart unless-stopped \
 --network vault-network \
+--env NO_PROXY=vault-server \
 -e ARGS="$ARGS --api-key $API_KEY" \
 vault
 
@@ -68,6 +69,7 @@ docker run -d \
 --name vault-server \
 --restart unless-stopped \
 --network vault-network \
+--env NO_PROXY=vault-converter \
 -p $PORT:$SERVER_PORT \
 -e ARGS="$ARGS --api-key $API_KEY" \
 -v vault-volume:/root \
