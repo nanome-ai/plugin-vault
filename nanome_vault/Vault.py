@@ -8,6 +8,7 @@ from nanome.util import async_callback, Logs
 from nanome.util.enums import Integrations, NotificationTypes
 
 from .menus import VaultMenu
+from .OBJLoader import OBJLoader
 from .VaultManager import VaultManager
 from . import Workspace
 
@@ -33,6 +34,7 @@ class Vault(nanome.AsyncPluginInstance):
 
         self.menu = VaultMenu(self, server_url)
         self.vault = VaultManager(api_key)
+        self.obj_loader = OBJLoader(self)
         self.extensions = self.vault.get_extensions()
 
     def on_run(self):
@@ -102,6 +104,23 @@ class Vault(nanome.AsyncPluginInstance):
                 macro.save()
             msg = f'Macro "{item_name}" added'
 
+        elif extension == 'obj':
+            tex_path = None
+            for ext in ['.png', '.jpg', '.jpeg']:
+                tex_name = f'{item_name}{ext}'
+                tex_in = os.path.join(self.menu.path, tex_name)
+                tex_out = os.path.join(temp.name, tex_name)
+                if self.vault.get_file(tex_in, key, tex_out):
+                    tex_path = tex_out
+                    break
+            try:
+                await self.obj_loader.load(item_name, file_path, tex_path)
+                msg = f'OBJ "{item_name}" loaded'
+            except Exception as e:
+                error = f'OBJ "{item_name}" error: {e}'
+                self.send_notification(NotificationTypes.error, error)
+                Logs.warning(error)
+
         elif extension in self.extensions['supported'] + self.extensions['extras']:
             await self.send_files_to_load(file_path)
 
@@ -163,7 +182,7 @@ def create_parser():
 
 
 def get_default_url(port, https=False):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)    
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     preferred_address = '10.255.255.255'
     secondary_address = 'localhost'
     try:
@@ -185,7 +204,7 @@ def main():
     # Plugin server (for Web)
     parser = create_parser()
     args, _ = parser.parse_known_args()
-    
+
     api_key = args.api_key
     https = args.https
     port = args.web_port
