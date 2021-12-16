@@ -1,3 +1,4 @@
 nanome
+open3d
 pycryptodome
 requests
