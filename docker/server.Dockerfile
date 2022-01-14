@@ -7,6 +7,7 @@ WORKDIR /app
 COPY server/yarn.lock server/package.json ./
 RUN yarn install --production
 COPY server .
+RUN cd ui && yarn install && yarn build
 
 EXPOSE 80 443
 
