@@ -36,17 +36,18 @@ Vue.filter('extensions', extensions => {
 })
 
 store.dispatch('getInfo')
-store.dispatch('refresh')
+store.dispatch('refresh').then(() => {
+  // global modal singleton
+  const VModal = Vue.extend(Modal)
+  const modal = new VModal({ store })
+  modal.$mount()
+  Vue.prototype.$modal = modal
 
-const app = new Vue({
-  router,
-  store,
-  render: h => h(App)
-}).$mount('#app')
+  const app = new Vue({
+    router,
+    store,
+    render: h => h(App)
+  }).$mount('#app')
 
-// global modal singleton
-const VModal = Vue.extend(Modal)
-const modal = new VModal({ store })
-modal.$mount()
-Vue.prototype.$modal = modal
-app.$root.$el.appendChild(modal.$el)
+  app.$root.$el.appendChild(modal.$el)
+})

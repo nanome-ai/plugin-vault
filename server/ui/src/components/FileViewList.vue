@@ -50,6 +50,37 @@
       </template>
 
       <template v-if="path == '/'">
+        <li v-if="org" class="p-2 flex items-center">
+          <fa-icon
+            icon="angle-right"
+            class="text-2xl w-8 cursor-pointer text-gray-500 hover:text-black"
+            fixed-width
+            @click="toggleFolder('my-org')"
+            :class="{ expanded: expanded['my-org'] }"
+          />
+
+          <router-link
+            to="/my-org/"
+            @contextmenu.native.prevent="contextmenu($event, 'my-org/')"
+            event="dblclick"
+            class="file cursor-default"
+          >
+            <fa-layers class="icon mr-2">
+              <fa-icon icon="folder" />
+              <fa-icon
+                icon="sitemap"
+                class="text-white"
+                transform="down-1 left-2 shrink-11"
+              />
+            </fa-layers>
+            <div>my org</div>
+          </router-link>
+        </li>
+
+        <li v-if="expanded['account']" key="account-expanded" class="pl-8">
+          <file-view-list v-if="unique" :path="`${path}account/`" nested />
+        </li>
+
         <li class="p-2 flex items-center">
           <fa-icon
             icon="angle-right"
@@ -153,7 +184,7 @@ export default {
   }),
 
   computed: {
-    ...mapState(['unique'])
+    ...mapState(['unique', 'org'])
   },
 
   methods: {

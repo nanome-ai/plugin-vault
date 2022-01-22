@@ -34,6 +34,11 @@ export default {
       if (this.beforeRefresh && newPath) this.beforeRefresh()
       this.loading = true
 
+      const needsAuth = /^\/(account|my-org)\//.test(this.path)
+      if (needsAuth && !this.$store.state.unique) {
+        await this.$modal.login()
+      }
+
       try {
         const data = await API.getFolder(this.path)
         this.key_path = data.locked_path

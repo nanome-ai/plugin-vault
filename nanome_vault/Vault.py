@@ -29,6 +29,8 @@ class Vault(nanome.AsyncPluginInstance):
         nanome.api.macro.Macro.set_plugin_identifier('')
 
         self.account = 'user-00000000'
+        self.org = None
+
         server_url = self.custom_data[0]
         api_key = self.custom_data[2]
 
@@ -61,13 +63,21 @@ class Vault(nanome.AsyncPluginInstance):
             return
 
         in_account = self.account in self.menu.path
+        in_org = self.org and self.org in self.menu.path
+
         self.account = info.account_id
         self.vault.create_path(self.account)
+
+        if info.has_org:
+            self.org = f'org-{info.org_id}'
+            self.vault.create_path(self.org)
+        else:
+            self.org = None
 
         if not self.menu.menu.enabled:
             return
 
-        if in_account:
+        if in_account or in_org:
             self.menu.path = '.'
             self.menu.open_folder('.')
         else:
