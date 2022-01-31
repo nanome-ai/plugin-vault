@@ -79,7 +79,7 @@ router.post(
         const unsupported = files
           .map(f => f.name)
           .filter(f => {
-            const ext = f.split('.').pop()
+            const ext = f.split('.').pop().toLowerCase()
             const extensions = [].concat(...Object.values(Vault.EXTENSIONS))
             return !extensions.includes(ext)
           })
@@ -93,8 +93,9 @@ router.post(
         const uploads = files.map(async file => {
           let name = file.name
           const split = name.split('.')
-          const ext = split.pop()
+          const ext = split.pop().toLowerCase()
           const base = split.join('.')
+          name = `${base}.${ext}`
 
           let data = fs.readFileSync(file.path)
           if (Vault.EXTENSIONS.converted.includes(ext)) {
