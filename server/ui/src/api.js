@@ -201,6 +201,11 @@ const API = {
     })
   },
 
+  move(path, folder) {
+    folder = replacePath(folder)
+    return sendCommand(path, 'move', { folder })
+  },
+
   delete(path) {
     return sendCommand(path, 'delete')
   },

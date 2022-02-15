@@ -27,31 +27,45 @@
     >
       <ul>
         <li v-if="menuOptions.canCreate">
-          <button class="text-gray-800" @click="newFolder(contextmenu.path)">
+          <button @click="newFolder(contextmenu.path)">
             <fa-icon icon="folder-plus" transform="shrink-2" class="icon" />
             new folder
           </button>
         </li>
         <li v-if="!menuOptions.isFolder">
-          <button class="text-gray-800" @click="downloadItem">
+          <button @click="downloadItem">
             <fa-icon icon="file-download" transform="shrink-2" class="icon" />
             download
           </button>
         </li>
         <li v-if="menuOptions.canEncrypt">
-          <button class="text-gray-800" @click="encryptFolder">
+          <button @click="encryptFolder">
             <fa-icon icon="lock" transform="shrink-2" class="icon" />
             encrypt
           </button>
         </li>
         <li v-else-if="contextmenu.encrypted">
-          <button class="text-gray-800" @click="decryptFolder">
+          <button @click="decryptFolder">
             <fa-icon icon="lock-open" transform="shrink-2" class="icon" />
             decrypt
           </button>
         </li>
+        <li v-if="menuOptions.canModify && moveDestinations.length">
+          <button @click.stop>
+            <fa-icon icon="truck-moving" transform="shrink-2" class="icon" />
+            move
+          </button>
+          <ul>
+            <li v-for="folder in moveDestinations" :key="folder.value">
+              <button @click="moveItem(folder.value)">
+                <fa-icon icon="folder" transform="shrink-2" class="icon" />
+                {{ folder.label }}
+              </button>
+            </li>
+          </ul>
+        </li>
         <li v-if="menuOptions.canModify">
-          <button class="text-gray-800" @click="renameItem">
+          <button @click="renameItem">
             <fa-icon icon="pen" transform="shrink-2" class="icon" />
             rename
           </button>
@@ -90,6 +104,7 @@ export default {
       component: null,
       path: '',
       locked: false,
+      folders: [],
       encrypted: false,
       key_path: null,
       top: 0,
@@ -120,6 +135,30 @@ export default {
         canModify,
         canEncrypt
       }
+    },
+
+    moveDestinations() {
+      const { isFolder } = this.menuOptions
+      const { folders, path } = this.contextmenu
+
+      const split = path.split('/')
+      const parts = isFolder ? -2 : -1
+      const base = split.slice(0, parts).join('/') + '/'
+      const parent = split.slice(0, parts - 1).join('/') + '/'
+      const item = split.slice(parts)[0]
+
+      const items = folders
+        .filter(f => f.name !== item)
+        .map(f => ({
+          label: f.name,
+          value: base + f.name
+        }))
+
+      if (parent !== '/') {
+        items.unshift({ label: '.. (parent)', value: parent })
+      }
+
+      return items
     }
   },
 
@@ -203,6 +242,21 @@ export default {
       } else {
         this.refresh()
       }
+    },
+
+    async moveItem(folder) {
+      const { path } = this.contextmenu
+      const { success } = await API.move(path, folder)
+
+      if (!success) {
+        this.$modal.alert({
+          title: 'Move Failed',
+          body: 'Item already exists at destination'
+        })
+        return
+      }
+
+      this.refresh()
     },
 
     async deleteItem() {
@@ -313,6 +367,7 @@ export default {
       this.contextmenu.show = true
       this.contextmenu.path = e.path
       this.contextmenu.locked = e.locked
+      this.contextmenu.folders = e.folders
       this.contextmenu.encrypted = e.encrypted
       this.contextmenu.key_path = e.key_path
       this.contextmenu.component = e.component
@@ -330,6 +385,7 @@ export default {
       this.contextmenu.show = false
       this.contextmenu.path = ''
       this.contextmenu.locked = false
+      this.contextmenu.folders = []
       this.contextmenu.encrypted = false
       this.contextmenu.key_path = null
       this.contextmenu.component = null
@@ -341,16 +397,38 @@ export default {
 <style lang="scss">
 .file-explorer {
   .contextmenu {
-    @apply absolute bg-white text-xl w-48 rounded shadow-md overflow-hidden;
+    @apply absolute text-gray-800 text-xl;
 
-    button {
-      @apply px-2 py-1 w-full text-left;
+    ul {
+      @apply bg-white w-48 rounded shadow-md;
+    }
 
-      &:hover {
+    li {
+      @apply relative;
+
+      > ul {
+        @apply hidden absolute top-0;
+        left: 100%;
+      }
+
+      &:hover > button {
         @apply bg-gray-200;
       }
+
+      &:hover > ul {
+        @apply block;
+      }
+    }
+
+    button {
+      @apply px-2 py-1 w-full text-left rounded;
+
       &:focus {
-        @apply outline-none;
+        @apply bg-gray-200 outline-none;
+
+        + ul {
+          @apply block;
+        }
       }
 
       .icon {
