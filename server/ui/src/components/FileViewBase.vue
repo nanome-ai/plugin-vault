@@ -67,6 +67,7 @@ export default {
         event,
         path: this.path + item,
         locked: this.isLocked(item),
+        folders: this.folders,
         encrypted,
         key_path: this.key_path,
         component: this

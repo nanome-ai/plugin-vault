@@ -41,7 +41,7 @@ router.post(
   auth,
   asyncWrap(async (req, res) => {
     let path = decodeURI(req.path).slice(7)
-    const { command, name, key } = req.fields
+    const { command, folder, name, key } = req.fields
 
     const needsKey = ['create', 'delete', 'rename', 'upload'].includes(command)
     if (needsKey && !Vault.isKeyValid(path, key)) throw HTTPError.FORBIDDEN
@@ -65,6 +65,11 @@ router.post(
 
       case 'encrypt':
         Vault.encryptFolder(path, key)
+        break
+
+      case 'move':
+        if (!folder) throw new HTTPError(400, 'Missing arg: "folder"')
+        Vault.movePath(path, folder)
         break
 
       case 'rename':

@@ -29,7 +29,8 @@ import {
   faSitemap,
   faSyncAlt,
   faTh,
-  faTrash
+  faTrash,
+  faTruckMoving
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add({
@@ -50,5 +51,6 @@ library.add({
   faSitemap,
   faSyncAlt,
   faTh,
-  faTrash
+  faTrash,
+  faTruckMoving
 })

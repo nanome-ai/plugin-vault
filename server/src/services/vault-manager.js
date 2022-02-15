@@ -270,6 +270,20 @@ exports.listPath = path => {
   return result
 }
 
+// moves a file/folder to folder
+exports.movePath = (path, folder) => {
+  const oldPath = exports.getVaultPath(path)
+  const base = ospath.basename(oldPath)
+  const destPath = exports.getVaultPath(folder, false)
+  const newPath = ospath.join(destPath, base)
+
+  if (fs.existsSync(newPath)) {
+    throw new HTTPError(400, 'Item already exists at destination')
+  }
+
+  fs.renameSync(oldPath, newPath)
+}
+
 // renames a file/folder at path
 exports.renamePath = (path, name) => {
   const oldPath = exports.getVaultPath(path)
