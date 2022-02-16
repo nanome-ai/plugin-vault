@@ -52,9 +52,17 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 
   Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `--keep-files-days 14`
 
+- `--ui-message message`
+
+  Add a custom message to the web UI, appearing right under the "Nanome Vault" at the top of the page. Example `--ui-message "Hello, Vault!"`
+
 - `-u url` or `--url url`
 
   The url to display in the plugin for accessing the Web UI. Example: `-u vault.example.com`
+
+- `--user-storage size`
+
+  The size of the user storage, defaults to unlimited. Supports suffixes: `k`, `m`, `g`. Example: `--user-storage 1g`. When user storage is exceeded, new files will fail to upload and a message will be displayed.
 
 - `-w port` or `--web-port port`
 

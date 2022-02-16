@@ -15,7 +15,8 @@ const state = {
     supported: [],
     extras: [],
     converted: []
-  }
+  },
+  message: null
 }
 
 const getters = {
@@ -33,6 +34,10 @@ const mutations = {
 
   SET_EXTENSIONS(state, extensions) {
     state.extensions = extensions
+  },
+
+  SET_MESSAGE(state, message) {
+    state.message = message
   }
 }
 
@@ -63,8 +68,9 @@ async function saveSession(commit, { success, results }) {
 
 const actions = {
   async getInfo({ commit }) {
-    const { extensions } = await API.getInfo()
+    const { extensions, message } = await API.getInfo()
     commit('SET_EXTENSIONS', extensions)
+    commit('SET_MESSAGE', message)
   },
 
   async login({ commit }, creds) {
