@@ -21,6 +21,12 @@ services:
       - 443:443
     volumes:
      - vault-volume:/root
+<<<<<<< HEAD
+=======
+    # environment:
+    #   - no_proxy=vault-server
+    #   - NO_PROXY=vault-server
+>>>>>>> Basic docker-compose file up
     env_file:
       - .env.preprod
 volumes:
