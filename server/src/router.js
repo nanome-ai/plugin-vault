@@ -15,7 +15,10 @@ const { HTTPError } = require('@/utils/error')
 const STATIC_DIR = ospath.resolve('ui/dist')
 
 router.get('/info', (req, res) => {
-  res.success({ extensions: Vault.EXTENSIONS })
+  res.success({
+    extensions: Vault.EXTENSIONS,
+    message: config.UI_MESSAGE
+  })
 })
 
 router.get('/files(/*)?', auth, (req, res) => {

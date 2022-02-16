@@ -4,6 +4,7 @@
       <div class="inline-flex items-baseline text-5xl">
         <img class="mr-4" src="@/assets/logo.png" /> Vault
       </div>
+      <div v-if="message" class="text-xl">{{ message }}</div>
     </header>
     <h1 class="font-bold">Upload Files to Nanome</h1>
 
@@ -66,7 +67,7 @@ import FileExplorer from '@/components/FileExplorer'
 export default {
   components: { FileExplorer },
   data: () => ({ showMore: false }),
-  computed: mapState(['authEnabled', 'token', 'name', 'extensions'])
+  computed: mapState(['authEnabled', 'token', 'name', 'extensions', 'message'])
 }
 </script>
 
