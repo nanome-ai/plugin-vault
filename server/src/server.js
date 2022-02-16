@@ -20,7 +20,7 @@ while (args.length) {
   } else if (arg === '--keep-files-days') {
     config.KEEP_FILES_DAYS = args.shift()
   } else if (arg === '--ui-message') {
-    config.UI_MESSAGE = args.shift()
+    config.UI_MESSAGE = args.shift().replace(/_/g, ' ')
   } else if (arg === '--user-storage') {
     const size = args.shift()
     const match = /^(?<num>\d+(\.\d+)?)(?<unit>[BbKkMmGg][Bb]?)?/.exec(size)

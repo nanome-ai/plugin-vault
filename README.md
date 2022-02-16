@@ -54,7 +54,7 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 
 - `--ui-message message`
 
-  Add a custom message to the web UI, appearing right under the "Nanome Vault" at the top of the page. Example `--ui-message "Hello, Vault!"`
+  Add a custom message to the web UI, appearing right under the "Nanome Vault" at the top of the page. There is an issue with spaces in the message and passing the arg to docker, so instead replace any space in the message with an underscore and it will be converted back into a space. Example `--ui-message "Hello,_Vault!"`
 
 - `-u url` or `--url url`
 
