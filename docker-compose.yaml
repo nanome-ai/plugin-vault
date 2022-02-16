@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  vault:
+    build:
+      context: .
+      dockerfile: docker/plugin.Dockerfile
+    ports:
+      - "${NTS_PORT-8888}:${NTS_PORT-8888}"
+    env_file:
+      - .env.preprod
+    volumes:
+      - .:/app
+
+  vault-server:
+    # container_name: vault-server
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+     - vault-volume:/root
+    env_file:
+      - .env.preprod
+volumes:
+  vault-volume:
+
+    
