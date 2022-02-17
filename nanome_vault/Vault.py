@@ -35,7 +35,7 @@ class Vault(nanome.AsyncPluginInstance):
         api_key = self.custom_data[2]
 
         self.menu = VaultMenu(self, server_url)
-        self.vault = VaultManager(api_key)
+        self.vault = VaultManager(api_key, server_url)
         self.obj_loader = OBJLoader(self)
         self.extensions = self.vault.get_extensions()
 
