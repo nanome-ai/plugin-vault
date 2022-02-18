@@ -6,3 +6,4 @@ dist
 /docker/redeploy.sh
 *.log
 .env*
+docker-compose.yaml
