@@ -7,6 +7,6 @@ ARG CACHEBUST
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY . .
+COPY nanome_vault .
 
 CMD python run.py ${ARGS}
