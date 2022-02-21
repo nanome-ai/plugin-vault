@@ -18,7 +18,7 @@ ACCOUNT_FOLDER = 'account'
 ORG_FOLDER = 'my org'
 
 class VaultMenu:
-    def __init__(self, plugin, address):
+    def __init__(self, plugin: nanome.PluginInstance, address):
         self.plugin = plugin
         self.address = address
         self.path = '.'
@@ -303,6 +303,9 @@ class VaultMenu:
         self.lst_actions.items.clear()
         self.lst_actions.items.append(make_action('Open Website'))
 
+        if self.plugin.obj_loader.objs:
+            self.lst_actions.items.append(make_action('Manage OBJs'))
+
         if self.path != '.' and not self.selected_items:
             self.lst_actions.items.append(make_action('Upload Here'))
             self.lst_actions.items.append(make_action('New Folder'))
@@ -440,7 +443,7 @@ class VaultMenu:
         self.lst_files.parent.enabled = False
         self.lbl_loading.parent.enabled = True
         self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
-        self.plugin.update_menu(self.menu)
+        self.plugin.update_node(self.ln_explorer)
 
         load_requests = []
         for btn in self.selected_items:
@@ -460,6 +463,8 @@ class VaultMenu:
             url = urllib.parse.quote(f'{self.address}/{path}')
             self.plugin.open_url(url)
             self.toggle_actions()
+        elif button.name == 'Manage OBJs':
+            self.plugin.obj_loader.show_list()
         elif button.name == 'Upload Here':
             self.toggle_upload()
             self.toggle_actions()
