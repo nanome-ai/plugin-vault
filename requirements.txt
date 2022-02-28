@@ -1,4 +1,4 @@
-nanome
+nanome==0.35.1
 open3d
 pycryptodome
 requests
