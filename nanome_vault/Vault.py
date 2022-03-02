@@ -127,9 +127,9 @@ class Vault(nanome.AsyncPluginInstance):
                 await self.obj_loader.load(item_name, file_path, tex_path)
                 msg = f'OBJ "{item_name}" loaded'
             except Exception as e:
-                error = f'OBJ "{item_name}" error: {e}'
+                error = f'OBJ "{item_name}" failed to load'
                 self.send_notification(NotificationTypes.error, error)
-                Logs.warning(error)
+                Logs.warning(e)
 
         elif extension in self.extensions['supported'] + self.extensions['extras']:
             await self.send_files_to_load(file_path)
