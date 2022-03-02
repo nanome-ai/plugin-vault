@@ -18,6 +18,7 @@ EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Brows
 
 # Plugin instance (for Nanome)
 class Vault(nanome.AsyncPluginInstance):
+
     def start(self):
         self.integration.import_file = lambda _: self.on_run()
         self.integration.export_locations = lambda req: req.send_response(EXPORT_LOCATIONS)
