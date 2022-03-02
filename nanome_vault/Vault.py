@@ -31,10 +31,9 @@ class Vault(nanome.AsyncPluginInstance):
         self.account = 'user-00000000'
         self.org = None
 
-        server_url = self.custom_data[0]
-        api_key = self.custom_data[2]
+        url, api_key = self.custom_data
 
-        self.menu = VaultMenu(self, server_url)
+        self.menu = VaultMenu(self, url)
         self.vault = VaultManager(api_key)
         self.obj_loader = OBJLoader(self)
         self.extensions = self.vault.get_extensions()
@@ -191,22 +190,15 @@ def create_parser():
     return parser
 
 
-def get_default_url(port, https=False):
+def get_default_url():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    preferred_address = '10.255.255.255'
-    secondary_address = 'localhost'
     try:
-        s.connect((preferred_address, 1))
+        s.connect(('10.255.255.255', 1))
         url = s.getsockname()[0]
     except:
-        url = secondary_address
+        url = 'localhost'
     finally:
         s.close()
-
-    if https:
-        url = 'https://' + url
-    else:
-        url += ':' + str(port)
     return url
 
 
@@ -218,10 +210,14 @@ def main():
     api_key = args.api_key
     https = args.https
     port = args.web_port
-    if port is None:
-        port = HTTPS_PORT if https else DEFAULT_WEB_PORT
+    url = args.url
 
-    url = args.url or get_default_url(port, https)
+    if url is None:
+        url = get_default_url()
+    if https:
+        url = f'https://{url}'
+    if port:
+        url = f'{url}:{port}'
 
     # Plugin
     integrations = [
@@ -231,7 +227,7 @@ def main():
     ]
     plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False, integrations=integrations)
     plugin.set_plugin_class(Vault)
-    plugin.set_custom_data(url, port, api_key)
+    plugin.set_custom_data(url, api_key)
     plugin.run()
 
 if __name__ == '__main__':
