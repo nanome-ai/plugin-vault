@@ -6,4 +6,5 @@ dist
 /docker/redeploy.sh
 *.log
 .env*
+!.env.sample
 docker-compose.yaml

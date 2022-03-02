@@ -22,7 +22,6 @@ class Vault(nanome.AsyncPluginInstance):
         self.integration.import_file = lambda _: self.on_run()
         self.integration.export_locations = lambda req: req.send_response(EXPORT_LOCATIONS)
         self.integration.export_file = self.on_export_integration
-
         self.set_plugin_list_button(self.PluginListButtonType.run, 'Open')
 
         # set to empty string to read/write macros in Macros folder
@@ -31,11 +30,12 @@ class Vault(nanome.AsyncPluginInstance):
         self.account = 'user-00000000'
         self.org = None
 
-        server_url = self.custom_data[0]
+        external_url = self.custom_data[0]
         api_key = self.custom_data[2]
+        internal_url = self.custom_data[3]
 
-        self.menu = VaultMenu(self, server_url)
-        self.vault = VaultManager(api_key, server_url)
+        self.menu = VaultMenu(self, external_url)
+        self.vault = VaultManager(api_key, internal_url)
         self.obj_loader = OBJLoader(self)
         self.extensions = self.vault.get_extensions()
 
@@ -194,17 +194,22 @@ def create_parser():
         '-s', '--https', '--ssl-cert',
         dest='https',
         action='store_true',
-        default=os.environ.get("HTTPS", None),
+        default=os.environ.get("HTTPS"),
         help='Enable HTTPS on the Vault Web UI')
     vault_group.add_argument(
-        '-u', '--url',
-        dest='url',
+        '-u', '--url', '--external-url',
+        dest='external_url',
         type=str,
         default=os.environ.get("VAULT_URL"),
         help='Vault Web UI URL. If omitted, IP address will be shown in plugin menu. Include http:// or https://')
+    vault_group.add_argument(
+        '--internal-url',
+        dest='internal_url',
+        type=str,
+        default='http://vault-server/',
+        help='URL used for inter-container communication between vault and vault-server')
     vault_group.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Web UI.', required=False)
     return parser
-
 
 def get_default_url(port, https=False):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -236,7 +241,8 @@ def main():
     if port is None:
         port = HTTPS_PORT if https else DEFAULT_WEB_PORT
 
-    url = args.url or get_default_url(port, https)
+    external_url = args.external_url or get_default_url(port, https)
+    internal_url = args.internal_url
     # Plugin
     integrations = [
         Integrations.import_file,
@@ -245,7 +251,7 @@ def main():
     ]
     plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False, integrations=integrations)
     plugin.set_plugin_class(Vault)
-    plugin.set_custom_data(url, port, api_key)
+    plugin.set_custom_data(external_url, port, api_key, internal_url)
     plugin.run()
 
 if __name__ == '__main__':

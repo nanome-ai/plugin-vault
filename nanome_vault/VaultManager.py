@@ -3,6 +3,7 @@ from nanome.util import Logs
 
 
 class VaultManager:
+    
     def __init__(self, api_key, server_url):
         self.api_key = api_key
         self.server_url = server_url
