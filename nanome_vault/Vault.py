@@ -200,8 +200,8 @@ def create_parser():
         '-u', '--url',
         dest='url',
         type=str,
-        default=os.environ.get("VAULT_URL", None),
-        help='Vault Web UI URL. If omitted, IP address will be shown in plugin menu.')
+        default=os.environ.get("VAULT_URL"),
+        help='Vault Web UI URL. If omitted, IP address will be shown in plugin menu. Include http:// or https://')
     vault_group.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Web UI.', required=False)
     return parser
 
@@ -212,16 +212,16 @@ def get_default_url(port, https=False):
     secondary_address = 'localhost'
     try:
         s.connect((preferred_address, 1))
-        url = s.getsockname()[0]
+        address = s.getsockname()[0]
     except:
-        url = secondary_address
+        address = secondary_address
     finally:
         s.close()
 
     if https:
-        url = 'https://' + url
+        url = f'https://{address}:{port}'
     else:
-        url += ':' + str(port)
+        url = f'http://{address}:{port}'
     return url
 
 
@@ -237,7 +237,6 @@ def main():
         port = HTTPS_PORT if https else DEFAULT_WEB_PORT
 
     url = args.url or get_default_url(port, https)
-
     # Plugin
     integrations = [
         Integrations.import_file,
