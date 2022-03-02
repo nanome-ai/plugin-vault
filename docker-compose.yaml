@@ -7,7 +7,7 @@ services:
     ports:
       - "${NTS_PORT-8888}:${NTS_PORT-8888}"
     env_file:
-      - .env.preprod
+      - .env
     volumes:
       - .:/app
 
@@ -22,7 +22,7 @@ services:
     volumes:
      - vault-volume:/root
     env_file:
-      - .env.preprod
+      - .env
 volumes:
   vault-volume:
 
