@@ -214,7 +214,7 @@ def main():
 
     if url is None:
         url = get_default_url()
-    if https:
+    if https and not url.startswith('https://'):
         url = f'https://{url}'
     if port:
         url = f'{url}:{port}'
