@@ -6,9 +6,7 @@ services:
       dockerfile: docker/plugin.Dockerfile
     env_file:
       - .env
-    volumes:
-      - .:/app
-
+      - .env.plugin
   vault-server:
     build:
       context: .
@@ -18,8 +16,10 @@ services:
       - 443:443
     volumes:
      - vault-volume:/root
+     - .:/app/server
     env_file:
       - .env
+      - .env.server
 volumes:
   vault-volume:
 

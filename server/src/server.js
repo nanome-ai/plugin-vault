@@ -7,6 +7,27 @@ const app = require('./app')
 const config = require('./config')
 const cron = require('./services/cron')
 
+// Check environment variables for configs
+if(process.env.API_KEY && process.env.API_KEY != null){
+  config.API_KEY = process.env.API_KEY
+}
+if(process.env.CONVERTER_URL && process.env.CONVERTER_URL != null) {
+  config.CONVERTER_URL = process.env.CONVERTER_URL
+}
+if(process.env.ENABLE_AUTH && process.env.ENABLE_AUTH != null){
+  config.ENABLE_AUTH = process.env.ENABLE_AUTH
+}
+if(process.env.KEEP_FILES_DAYS && process.env.KEEP_FILES_DAYS != null){
+  config.KEEP_FILES_DAYS = process.env.KEEP_FILES_DAYS
+}
+if(process.env.UI_MESSAGE && process.env.UI_MESSAGE != null){
+  config.UI_MESSAGE = process.env.UI_MESSAGE
+}
+if(process.env.USER_STORAGE && process.env.USER_STORAGE != null){
+  config.USER_STORAGE = process.env.USER_STORAGE
+}
+
+// Check cli args for configs
 const args = process.argv.slice(2)
 while (args.length) {
   const arg = args.shift()
