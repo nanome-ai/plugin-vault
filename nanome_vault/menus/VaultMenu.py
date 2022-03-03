@@ -459,8 +459,8 @@ class VaultMenu:
 
     def on_action_pressed(self, button):
         if button.name == 'Open Website':
-            path = self.replace_path(self.path, True)
-            url = urllib.parse.quote(f'{self.address}/{path}')
+            path = urllib.parse.quote(self.replace_path(self.path, True))
+            url = f'{self.address}/{path}'
             self.plugin.open_url(url)
             self.toggle_actions()
         elif button.name == 'Manage OBJs':

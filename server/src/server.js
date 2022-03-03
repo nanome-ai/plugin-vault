@@ -36,7 +36,7 @@ while (args.length) {
 
 const options = {
   key: fs.readFileSync('./certs/local.key'),
-  cert: fs.readFileSync('./certs/local.cert')
+  cert: fs.readFileSync('./certs/local.crt')
 }
 
 https.createServer(options, app).listen(443)
