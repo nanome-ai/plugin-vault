@@ -4,15 +4,12 @@ services:
     build:
       context: .
       dockerfile: docker/plugin.Dockerfile
-    ports:
-      - "${NTS_PORT-8888}:${NTS_PORT-8888}"
     env_file:
       - .env
     volumes:
       - .:/app
 
   vault-server:
-    # container_name: vault-server
     build:
       context: .
       dockerfile: docker/server.Dockerfile
