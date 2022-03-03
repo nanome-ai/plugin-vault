@@ -32,15 +32,12 @@ class Vault(nanome.AsyncPluginInstance):
         self.account = 'user-00000000'
         self.org = None
 
-        url, api_key = self.custom_data
+        external_url = self.custom_data[0]
+        api_key = self.custom_data[2]
+        internal_url = self.custom_data[3]
 
-<<<<<<< HEAD
-        self.menu = VaultMenu(self, url)
-        self.vault = VaultManager(api_key)
-=======
-        self.menu = VaultMenu(self, server_url)
-        self.vault = VaultManager(api_key, server_url)
->>>>>>> pass server_url to VaultManager
+        self.menu = VaultMenu(self, external_url)
+        self.vault = VaultManager(api_key, internal_url)
         self.obj_loader = OBJLoader(self)
         self.extensions = self.vault.get_extensions()
 
