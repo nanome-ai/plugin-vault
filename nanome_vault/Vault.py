@@ -214,6 +214,7 @@ def create_parser():
         '-w', '--web-port',
         dest='web_port',
         type=int,
+        default=os.environ.get('VAULT_WEB_PORT', None),
         help='Custom port for connecting to Vault Web UI.',
         required=False)
     return parser
