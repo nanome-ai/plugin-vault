@@ -50,7 +50,6 @@ class VaultManager:
     # get supported file extensions
     def get_extensions(self):
         url = f'{self.server_url}/info'
-        Logs.message('Requesting extensions from ' + url)
         r = requests.get(url)
         return r.json()['extensions']
 
