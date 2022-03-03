@@ -209,7 +209,13 @@ def create_parser():
         type=str,
         default='http://vault-server/',
         help='URL used for inter-container communication between vault and vault-server')
-    vault_group.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Web UI.', required=False)
+    vault_group.add_argument(
+        '-w', '--web-port',
+        dest='web_port',
+        type=int,
+        default=os.environ.get("VAULT_PORT"),
+        help='Custom port for connecting to Vault Web UI.',
+        required=False)
     return parser
 
 def get_default_url(port, https=False):
