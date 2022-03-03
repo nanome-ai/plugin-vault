@@ -5,6 +5,8 @@ from nanome.util import Logs
 class VaultManager:
     def __init__(self, api_key, server_url):
         self.api_key = api_key
+        if server_url.endswith('/'):
+            server_url = server_url[:-1]
         self.server_url = server_url
 
     def command(self, command, path, data=None, files=None):
