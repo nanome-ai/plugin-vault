@@ -28,8 +28,8 @@ class VaultManager:
         url = self.server_url + '/files/' + (path or '')
         return requests.get(url, headers=headers)
 
-
     # add data to vault at path/filename, where filename can contain a path
+
     def add_file(self, path, filename, data, key=None):
         return self.command('upload', path, {'key': key}, {'files': (filename, data)})
 

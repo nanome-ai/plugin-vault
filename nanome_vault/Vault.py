@@ -17,6 +17,8 @@ HTTPS_PORT = 443
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Browse']
 
 # Plugin instance (for Nanome)
+
+
 class Vault(nanome.AsyncPluginInstance):
 
     def start(self):
@@ -166,8 +168,9 @@ class Vault(nanome.AsyncPluginInstance):
             else:
                 self.send_notification(NotificationTypes.error, r.json()['error']['message'])
 
-        temp.close() # unsure if needed
+        temp.close()  # unsure if needed
         os.remove(temp.name)
+
 
 def create_parser():
     """Create command line parser For Vault Plugin.
@@ -189,7 +192,7 @@ def create_parser():
     vault_group.add_argument(
         '--api-key',
         dest='api_key',
-        default=os.environ.get("API_KEY",""),
+        default=os.environ.get("API_KEY", ""),
         help=argparse.SUPPRESS,
         required=False)
     vault_group.add_argument(
@@ -243,7 +246,6 @@ def main():
     external_url = args.external_url
     internal_url = args.internal_url
 
-
     if external_url is None:
         external_url = get_default_url()
     if https and not external_url.startswith('https://'):
@@ -261,6 +263,7 @@ def main():
     plugin.set_plugin_class(Vault)
     plugin.set_custom_data(external_url, api_key, internal_url)
     plugin.run()
+
 
 if __name__ == '__main__':
     main()
