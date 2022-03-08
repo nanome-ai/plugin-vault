@@ -5,3 +5,7 @@ dist
 /docker/.cachebust
 /docker/redeploy.sh
 *.log
+.env*
+!.env.sample
+!.env.plugin.sample
+!.env.server.sample

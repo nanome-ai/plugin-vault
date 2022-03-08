@@ -1,10 +1,13 @@
 import requests
+from nanome.util import Logs
 
-API = 'http://vault-server/'
 
 class VaultManager:
-    def __init__(self, api_key):
+    def __init__(self, api_key, server_url):
         self.api_key = api_key
+        if server_url.endswith('/'):
+            server_url = server_url[:-1]
+        self.server_url = server_url
 
     def command(self, command, path, data=None, files=None):
         headers = {}
@@ -13,7 +16,7 @@ class VaultManager:
         if data is None:
             data = {}
         data['command'] = command
-        url = API + 'files/' + path
+        url = self.server_url + '/files/' + path
         return requests.post(url, headers=headers, data=data, files=files)
 
     def get(self, path, key):
@@ -22,11 +25,11 @@ class VaultManager:
             headers['vault-api-key'] = self.api_key
         if key:
             headers['vault-key'] = key
-        url = API + 'files/' + (path or '')
+        url = self.server_url + '/files/' + (path or '')
         return requests.get(url, headers=headers)
 
-
     # add data to vault at path/filename, where filename can contain a path
+
     def add_file(self, path, filename, data, key=None):
         return self.command('upload', path, {'key': key}, {'files': (filename, data)})
 
@@ -47,8 +50,9 @@ class VaultManager:
         return self.command('encrypt', path, {'key': key})
 
     # get supported file extensions
-    def get_extensions(self, ):
-        r = requests.get(API + 'info')
+    def get_extensions(self):
+        url = f'{self.server_url}/info'
+        r = requests.get(url)
         return r.json()['extensions']
 
     # write decrypted file to out_put

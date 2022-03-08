@@ -17,7 +17,10 @@ HTTPS_PORT = 443
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Browse']
 
 # Plugin instance (for Nanome)
+
+
 class Vault(nanome.AsyncPluginInstance):
+
     def start(self):
         self.integration.import_file = lambda _: self.on_run()
         self.integration.export_locations = lambda req: req.send_response(EXPORT_LOCATIONS)
@@ -31,10 +34,12 @@ class Vault(nanome.AsyncPluginInstance):
         self.account = 'user-00000000'
         self.org = None
 
-        url, api_key = self.custom_data
+        external_url = self.custom_data[0]
+        api_key = self.custom_data[1]
+        internal_url = self.custom_data[2]
 
-        self.menu = VaultMenu(self, url)
-        self.vault = VaultManager(api_key)
+        self.menu = VaultMenu(self, external_url)
+        self.vault = VaultManager(api_key, internal_url)
         self.obj_loader = OBJLoader(self)
         self.extensions = self.vault.get_extensions()
 
@@ -163,8 +168,9 @@ class Vault(nanome.AsyncPluginInstance):
             else:
                 self.send_notification(NotificationTypes.error, r.json()['error']['message'])
 
-        temp.close() # unsure if needed
+        temp.close()  # unsure if needed
         os.remove(temp.name)
+
 
 def create_parser():
     """Create command line parser For Vault Plugin.
@@ -183,10 +189,37 @@ def create_parser():
         plugin_group._add_action(action)
 
     # Add Vault specific arguments
-    vault_group.add_argument('--api-key', dest='api_key', help=argparse.SUPPRESS, required=False)
-    vault_group.add_argument('-s', '--https', '--ssl-cert', dest='https', action='store_true', help='Enable HTTPS on the Vault Web UI')
-    vault_group.add_argument('-u', '--url', dest='url', type=str, help='Vault Web UI URL. If omitted, IP address will be shown in plugin menu.')
-    vault_group.add_argument('-w', '--web-port', dest='web_port', type=int, help='Custom port for connecting to Vault Web UI.', required=False)
+    vault_group.add_argument(
+        '--api-key',
+        dest='api_key',
+        default=os.environ.get("API_KEY", ""),
+        help=argparse.SUPPRESS,
+        required=False)
+    vault_group.add_argument(
+        '-s', '--https', '--ssl-cert',
+        dest='https',
+        action='store_true',
+        default=os.environ.get("HTTPS", None),
+        help='Enable HTTPS on the Vault Web UI')
+    vault_group.add_argument(
+        '-u', '--url', '--external_url',
+        dest='external_url',
+        type=str,
+        default=os.environ.get("VAULT_URL", None),
+        help='Vault Web UI URL. If omitted, IP address will be shown in plugin menu.')
+    vault_group.add_argument(
+        '--internal-url',
+        dest='internal_url',
+        type=str,
+        default='http://vault-server',
+        help='URL used for inter-container communication between vault and vault-server')
+    vault_group.add_argument(
+        '-w', '--web-port',
+        dest='web_port',
+        type=int,
+        default=os.environ.get('VAULT_WEB_PORT', None),
+        help='Custom port for connecting to Vault Web UI.',
+        required=False)
     return parser
 
 
@@ -210,14 +243,15 @@ def main():
     api_key = args.api_key
     https = args.https
     port = args.web_port
-    url = args.url
+    external_url = args.external_url
+    internal_url = args.internal_url
 
-    if url is None:
-        url = get_default_url()
-    if https and not url.startswith('https://'):
-        url = f'https://{url}'
+    if external_url is None:
+        external_url = get_default_url()
+    if https and not external_url.startswith('https://'):
+        external_url = f'https://{external_url}'
     if port:
-        url = f'{url}:{port}'
+        external_url = f'{external_url}:{port}'
 
     # Plugin
     integrations = [
@@ -227,8 +261,9 @@ def main():
     ]
     plugin = nanome.Plugin('Vault', 'Use your browser to upload files and folders to make them available in Nanome.', 'Files', False, integrations=integrations)
     plugin.set_plugin_class(Vault)
-    plugin.set_custom_data(url, api_key)
+    plugin.set_custom_data(external_url, api_key, internal_url)
     plugin.run()
+
 
 if __name__ == '__main__':
     main()
