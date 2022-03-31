@@ -1,3 +1,8 @@
 .git
 **/__pycache__
 **/node_modules
+*
+!plugin
+!server
+!requirements.txt
+!run.py
