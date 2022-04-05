@@ -78,17 +78,21 @@ if [ $NGINX -eq 0 ]; then
     SERVER_ARGS+=(-p $PORT:$SERVER_PORT)
 fi
 
+plugin_container_name="vault"
 docker run -d \
---name vault \
+--name $plugin_container_name \
 --restart unless-stopped \
 --network vault-network \
+-h $(hostname)-$plugin_container_name \
 --env no_proxy=vault-server \
 --env NO_PROXY=vault-server \
 -e ARGS="$ARGS --api-key $API_KEY" \
-vault
+$plugin_container_name
 
+
+server_container_name="vault-server"
 docker run -d \
---name vault-server \
+--name $server_container_name \
 --restart unless-stopped \
 --network vault-network \
 --env no_proxy=vault-converter \
@@ -96,4 +100,4 @@ docker run -d \
 ${SERVER_ARGS[@]} \
 -e ARGS="$ARGS --api-key $API_KEY" \
 -v vault-volume:/root \
-vault-server
+$server_container_name
