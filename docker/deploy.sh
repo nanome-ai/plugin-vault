@@ -79,18 +79,18 @@ if [ $NGINX -eq 0 ]; then
 fi
 
 plugin_container_name="vault"
+server_container_name="vault-server"
+
 docker run -d \
 --name $plugin_container_name \
 --restart unless-stopped \
 --network vault-network \
 -h $(hostname)-$plugin_container_name \
---env no_proxy=vault-server \
---env NO_PROXY=vault-server \
+--env no_proxy=$server_container_name \
+--env NO_PROXY=$server_container_name \
 -e ARGS="$ARGS --api-key $API_KEY" \
 $plugin_container_name
 
-
-server_container_name="vault-server"
 docker run -d \
 --name $server_container_name \
 --restart unless-stopped \
