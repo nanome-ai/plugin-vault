@@ -35,6 +35,11 @@ Vue.filter('extensions', extensions => {
   return extensions.map(ext => '.' + ext).join(', ')
 })
 
+Vue.filter('pluralize', (num, text, ending = 's') => {
+  text = num + ' ' + text
+  return num === 1 ? text : text + ending
+})
+
 store.dispatch('getInfo')
 store.dispatch('refresh').then(() => {
   // global modal singleton

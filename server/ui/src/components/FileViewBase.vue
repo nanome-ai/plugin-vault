@@ -1,5 +1,6 @@
 <script>
 import API from '@/api'
+import debounce from '@/helpers/debounce'
 
 export default {
   props: {
@@ -23,9 +24,10 @@ export default {
   },
 
   mounted() {
-    this.$root.$on('refresh', this.refresh)
+    const debounceRefresh = debounce(this.refresh, 500)
+    this.$root.$on('refresh', debounceRefresh)
     this.$once('hook:beforeDestroy', () => {
-      this.$root.$off('refresh', this.refresh)
+      this.$root.$off('refresh', debounceRefresh)
     })
   },
 

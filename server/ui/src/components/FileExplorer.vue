@@ -14,7 +14,7 @@
     >
       <file-view-grid v-if="displayMode === 'grid'" :path="path" />
       <file-view-list v-else :path="path" />
-      <file-dropzone ref="dropzone" @upload="refresh" :path="path" />
+      <file-dropzone ref="dropzone" :path="path" />
     </div>
 
     <div
