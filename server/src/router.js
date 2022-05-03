@@ -1,18 +1,14 @@
 const express = require('express')
 const router = express.Router()
 
-const fs = require('fs')
-const ospath = require('path')
-const fetch = require('node-fetch')
-const FormData = require('form-data')
-const config = require('./config')
-
+const config = require('@/config')
+const Upload = require('@/services/upload')
 const Vault = require('@/services/vault-manager')
 const asyncWrap = require('@/utils/async-wrap')
 const auth = require('@/utils/auth')
 const { HTTPError } = require('@/utils/error')
 
-const STATIC_DIR = ospath.resolve('ui/dist')
+const STATIC_DIR = require('path').resolve('ui/dist')
 
 router.get('/info', (req, res) => {
   res.success({
@@ -46,7 +42,13 @@ router.post(
     let path = decodeURI(req.path).slice(7)
     const { command, folder, name, key } = req.fields
 
-    const needsKey = ['create', 'delete', 'rename', 'upload'].includes(command)
+    const needsKey = [
+      'create',
+      'delete',
+      'rename',
+      'upload',
+      'upload-init'
+    ].includes(command)
     if (needsKey && !Vault.isKeyValid(path, key)) throw HTTPError.FORBIDDEN
 
     if (!key && ['decrypt', 'encrypt', 'verify'].includes(command)) {
@@ -84,48 +86,37 @@ router.post(
         let { files } = req.files
         if (!Array.isArray(files)) files = [files]
 
-        const unsupported = files
-          .map(f => f.name)
-          .filter(f => {
-            const ext = f.split('.').pop().toLowerCase()
-            const extensions = [].concat(...Object.values(Vault.EXTENSIONS))
-            return !extensions.includes(ext)
-          })
-
-        if (unsupported.length) {
-          const msg = 'Format not supported: ' + unsupported.join(', ')
-          throw new HTTPError(400, msg)
-        }
-
         let failed = []
         const uploads = files.map(async file => {
-          let name = file.name
-          const split = name.split('.')
-          const ext = split.pop().toLowerCase()
-          const base = split.join('.')
-          name = `${base}.${ext}`
-
-          let data = fs.readFileSync(file.path)
-          if (Vault.EXTENSIONS.converted.includes(ext)) {
-            const body = new FormData()
-            body.append('files', data, name)
-
-            const url = config.CONVERTER_URL + '/convert/office'
-            data = await fetch(url, { method: 'POST', body })
-              .then(res => res.buffer())
-              .catch(() => {
-                failed.push(name)
-              })
-            name = base + '.pdf'
-          }
-
-          if (data) {
-            Vault.addFile(path, name, data, key)
+          try {
+            await Upload.finalizeUpload(file.name, file.path, path, key)
+          } catch (e) {
+            if (e instanceof HTTPError) throw e
+            failed.push(file.name)
           }
         })
 
         await Promise.all(uploads)
         return res.success(failed.length ? { failed } : {})
+
+      case 'upload-init':
+        if (!name) throw new HTTPError(400, 'Missing arg: "name"')
+        if (!req.fields.size) throw new HTTPError(400, 'Missing arg: "size"')
+        const id = Upload.initUpload(path, name, key, req.fields.size)
+        return res.success({ id })
+
+      case 'upload-cancel':
+        if (!req.fields.id) throw new HTTPError(400, 'Missing arg: "id"')
+        Upload.cancelUpload(req.fields.id)
+        break
+
+      case 'upload-chunk':
+        let { chunk } = req.files
+        if (!chunk || Array.isArray(chunk)) {
+          throw new HTTPError(400, 'Invalid upload chunk')
+        }
+        await Upload.uploadChunk(req.headers, chunk)
+        break
 
       case 'verify':
         const success = Vault.isKeyValid(path, key)

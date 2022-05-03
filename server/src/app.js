@@ -1,6 +1,7 @@
 const express = require('express')
 const app = express()
 const formidable = require('express-formidable')
+const Vault = require('@/services/vault-manager')
 
 // response helpers
 express.response.success = function (data) {
@@ -25,7 +26,17 @@ express.response.error = function (error, statusCode) {
 app.use(require('morgan')('dev')) // logging
 app.use(require('helmet')({ contentSecurityPolicy: false }))
 app.use(require('compression')())
-app.use(formidable({ multiples: true, maxFileSize: 1024 ** 3 }))
+app.use(
+  formidable({
+    multiples: true,
+    maxFileSize: 1024 ** 3,
+    uploadDir: Vault.UPLOADS_DIR,
+    filter: file => {
+      const ext = file.originalFilename.split('.').pop().toLowerCase()
+      return Vault.ALL_EXTENSIONS.includes(ext)
+    }
+  })
+)
 app.use(require('./router'))
 
 // error handling

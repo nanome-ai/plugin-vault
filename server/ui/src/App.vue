@@ -1,8 +1,17 @@
 <template>
   <div id="app" class="w-screen h-screen">
     <router-view />
+    <UploadManager />
   </div>
 </template>
+
+<script>
+import UploadManager from '@/components/UploadManager'
+
+export default {
+  components: { UploadManager }
+}
+</script>
 
 <style lang="scss">
 :root {

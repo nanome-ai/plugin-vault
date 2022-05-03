@@ -16,6 +16,8 @@ const WALK_SETTINGS = new walk.Settings({
 
 const LOCK_TEXT = 'nanome-vault-lock'
 const FILES_DIR = ospath.join(os.homedir(), 'Documents/nanome-vault')
+const UPLOADS_DIR = ospath.join(os.tmpdir(), 'nanome-vault')
+fs.ensureDirSync(UPLOADS_DIR)
 
 const SHARED_DIR = ospath.join(FILES_DIR, 'shared')
 fs.ensureDirSync(SHARED_DIR)
@@ -27,18 +29,14 @@ exports.EXTENSIONS = {
   converted: ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp']
 }
 
+exports.ALL_EXTENSIONS = [].concat(...Object.values(exports.EXTENSIONS))
+
 exports.FILES_DIR = FILES_DIR
+exports.UPLOADS_DIR = UPLOADS_DIR
 
 // add data to vault at path/filename, where filename can contain a path
 exports.addFile = (path, filename, data, key) => {
-  const match = /^(user-[0-9a-f]{8})/.exec(path)
-  if (match && config.USER_STORAGE) {
-    const userPath = exports.getVaultPath(match[1], false)
-    if (du(userPath) + data.length > config.USER_STORAGE) {
-      const msg = `User storage exceeded (max ${config.USER_STORAGE_MSG})`
-      throw new HTTPError(413, msg)
-    }
-  }
+  exports.checkStorageLimit(path, data.length)
 
   if (key !== undefined) {
     data = aes.encrypt(data, key)
@@ -60,6 +58,18 @@ exports.addFile = (path, filename, data, key) => {
   }
 
   fs.writeFileSync(filePath, data)
+}
+
+// throws error if size exceeds user storage limit
+exports.checkStorageLimit = (path, size) => {
+  const match = /^(user-[0-9a-f]{8})/.exec(path)
+  if (match && config.USER_STORAGE) {
+    const userPath = exports.getVaultPath(match[1], false)
+    if (du(userPath) + size > config.USER_STORAGE) {
+      const msg = `User storage exceeded (max ${config.USER_STORAGE_MSG})`
+      throw new HTTPError(413, msg)
+    }
+  }
 }
 
 // creates a path or throws if path exists

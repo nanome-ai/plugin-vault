@@ -183,22 +183,70 @@ const API = {
       data.append('files', file)
     }
 
-    return new Promise(resolve => {
-      const request = new XMLHttpRequest()
+    const request = new XMLHttpRequest()
+    const cancel = () => request.abort()
+
+    const promise = new Promise((resolve, reject) => {
       request.open('POST', '/files' + replacePath(path), true)
       request.upload.addEventListener('progress', onProgress)
 
+      if (store.state.token) {
+        request.setRequestHeader('Authorization', 'Bearer ' + store.state.token)
+      }
+
+      request.addEventListener('abort', () => reject())
       request.addEventListener('load', () => {
         const json = JSON.parse(request.responseText)
         json.code = request.status
         resolve(json)
       })
+      request.send(data)
+    })
+
+    return { promise, cancel }
+  },
+
+  uploadInit(path, name, size) {
+    return sendCommand(path, 'upload-init', { name, size })
+  },
+
+  uploadCancel(id) {
+    return sendCommand('', 'upload-cancel', { id })
+  },
+
+  uploadChunk({ id, name, chunk, start, end, size, onProgress }) {
+    const data = new FormData()
+    data.append('command', 'upload-chunk')
+    data.append('chunk', chunk)
+
+    const request = new XMLHttpRequest()
+    const cancel = () => {
+      API.uploadCancel(id)
+      request.abort()
+    }
+
+    const promise = new Promise((resolve, reject) => {
+      request.open('POST', '/files', true)
+      request.upload.addEventListener('progress', onProgress)
+
+      request.setRequestHeader('X-Upload-ID', id)
+      request.setRequestHeader('X-File-Name', name)
+      request.setRequestHeader('Content-Range', `bytes ${start}-${end}/${size}`)
 
       if (store.state.token) {
         request.setRequestHeader('Authorization', 'Bearer ' + store.state.token)
       }
+
+      request.addEventListener('abort', () => reject())
+      request.addEventListener('load', () => {
+        const json = JSON.parse(request.responseText)
+        json.code = request.status
+        resolve(json)
+      })
       request.send(data)
     })
+
+    return { promise, cancel }
   },
 
   move(path, folder) {

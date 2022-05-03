@@ -1,6 +1,6 @@
 <template>
   <div
-    v-show="showDropzone || isUploading"
+    v-show="showDropzone"
     @dragover.prevent
     @dragenter.prevent="isHovering = true"
     @dragleave.prevent.self="isHovering = false"
@@ -8,11 +8,7 @@
     class="file-dropzone"
     :class="{ hover: isHovering }"
   >
-    <label
-      v-if="showDropzone || isUploading"
-      v-click-out="hide"
-      class="message m-4"
-    >
+    <label v-if="showDropzone" v-click-out="hide" class="message m-4">
       <input
         class="visually-hidden"
         @change="onChange"
@@ -21,18 +17,7 @@
         multiple
       />
       <div class="text-4xl">
-        <template v-if="isUploading">
-          Uploading {{ isConverting ? 'and converting' : '' }} files...
-          <div class="relative pt1">
-            <div class="overflow-hidden h-2 mb-4 rounded bg-gray-400">
-              <div
-                :style="{ width: `${100 * uploadProgress}%` }"
-                class="h-full bg-blue-500"
-              ></div>
-            </div>
-          </div>
-        </template>
-        <template v-else-if="!numDropping">
+        <template v-if="!numDropping">
           Drop items or
           <span class="text-blue-500">click</span>
           to upload
@@ -43,7 +28,7 @@
         </template>
       </div>
       <button
-        v-if="!numDropping && !isUploading"
+        v-if="!numDropping"
         @click="hide"
         class="link text-2xl text-red-500"
       >
@@ -55,7 +40,6 @@
 
 <script>
 import { mapGetters, mapState } from 'vuex'
-import API from '@/api'
 import { getFiles } from '@/helpers/files'
 
 export default {
@@ -66,11 +50,8 @@ export default {
   data: () => ({
     showDropzone: false,
     isHovering: false,
-    isConverting: false,
-    isUploading: false,
     numDropping: 0,
-    numEvents: 0,
-    uploadProgress: 0
+    numEvents: 0
   }),
 
   computed: {
@@ -116,13 +97,7 @@ export default {
       this.numDropping = 0
     },
 
-    onProgress(e) {
-      this.uploadProgress = e.loaded / e.total
-    },
-
     async upload(files) {
-      this.isUploading = true
-
       const skipped = []
       const upload = []
       const convert = []
@@ -148,35 +123,13 @@ export default {
             '<br><br><b>NOTE:</b> This can take a while.',
           okTitle: 'upload'
         })
-        this.isConverting = true
       }
 
       if (upload.length && confirmUpload) {
         const path = this.path === '/' ? '/shared/' : this.path
-        const res = await API.upload(path, upload, this.onProgress)
-
-        if (res.code !== 200) {
-          this.$modal.alert({
-            title: 'Upload Failed',
-            body: res.error.message
-          })
-        } else {
-          if (res.failed) {
-            const list = res.failed.join('<br>')
-            this.$modal.alert({
-              title: 'Convert Failed',
-              body: `Files were unable to be converted:<br>${list}`
-            })
-          }
-          if (path !== this.path) {
-            this.$router.push(path)
-          }
-        }
-        this.$emit('upload')
+        this.$root.$emit('upload', { path, files: upload })
       }
 
-      this.isConverting = false
-      this.isUploading = false
       this.showDropzone = false
 
       if (!upload.length) {

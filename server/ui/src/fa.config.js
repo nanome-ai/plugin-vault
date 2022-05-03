@@ -12,7 +12,9 @@ Vue.component('fa-layers', FontAwesomeLayers)
 Vue.component('fa-text', FontAwesomeLayersText)
 
 import {
+  faAngleDown,
   faAngleRight,
+  faAngleUp,
   faArrowUp,
   faBars,
   faCloudUploadAlt,
@@ -29,12 +31,15 @@ import {
   faSitemap,
   faSyncAlt,
   faTh,
+  faTimes,
   faTrash,
   faTruckMoving
 } from '@fortawesome/free-solid-svg-icons'
 
 library.add({
+  faAngleDown,
   faAngleRight,
+  faAngleUp,
   faArrowUp,
   faBars,
   faCloudUploadAlt,
@@ -51,6 +56,7 @@ library.add({
   faSitemap,
   faSyncAlt,
   faTh,
+  faTimes,
   faTrash,
   faTruckMoving
 })
