@@ -73,10 +73,11 @@ const API = {
     return request('/info')
   },
 
-  login({ username, password }) {
+  login({ username, password, tfa_code }) {
     const body = {
       login: username,
       pass: password,
+      tfa_code,
       source: 'web:plugin-vault'
     }
 

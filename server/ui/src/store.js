@@ -75,6 +75,9 @@ const actions = {
 
   async login({ commit }, creds) {
     const data = await API.login(creds)
+    if (data.code === 401) {
+      throw new Error(data.error.message)
+    }
     return saveSession(commit, data)
   },
 

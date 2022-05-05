@@ -29,9 +29,7 @@
               type="password"
             />
 
-            <p v-if="error" class="text-red-500">
-              incorrect login or password
-            </p>
+            <p v-if="error" class="text-red-500">incorrect login or password</p>
 
             <p>
               <a
@@ -238,19 +236,38 @@ export default {
     },
 
     async attemptLogin() {
+      const deferred = this.deferred
       this.error = false
-      this.loading = true
 
       const creds = {
         username: this.input1,
         password: this.input2
       }
 
-      const success = await this.$store.dispatch('login', creds)
+      let success
+      while (true) {
+        try {
+          this.loading = true
+          success = await this.$store.dispatch('login', creds)
+          break
+        } catch (e) {
+          this.loading = false
+          creds.tfa_code = await this.prompt({
+            title: 'Enter 2FA code',
+            body: 'Or use a one time recovery code',
+            okTitle: 'submit'
+          })
+          if (!creds.tfa_code) {
+            deferred.resolve(false)
+            this.reset()
+            return
+          }
+        }
+      }
       this.loading = false
 
       if (success) {
-        this.deferred.resolve(true)
+        deferred.resolve(true)
         this.reset()
       } else {
         this.error = true
