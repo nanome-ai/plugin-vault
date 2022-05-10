@@ -9,7 +9,7 @@ import nanome
 from nanome import ui
 from nanome.api.shapes import Mesh
 from nanome.api.structure import Atom, Chain, Complex, Molecule, Residue
-from nanome.util import async_callback, Vector3
+from nanome.util import async_callback, Color, Vector3
 from nanome.util.enums import ShapeAnchorType
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -123,6 +123,7 @@ class OBJLoader:
 
     async def load(self, name, obj_path, tex_path=None):
         mesh = Mesh()
+        mesh.color = Color.White()
 
         with open(obj_path, 'r') as f:
             lines = f.readlines()
