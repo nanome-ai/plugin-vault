@@ -287,7 +287,10 @@ class VaultMenu:
         for folder in folders:
             self.add_item(folder, True)
 
+        ignore_ext = self.plugin.extensions['external']
         for file in files:
+            if any(file['name'].endswith('.' + ext) for ext in ignore_ext):
+                continue
             self.add_item(file, False)
 
         self.plugin.update_content(self.lst_files)

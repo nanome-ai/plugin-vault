@@ -26,7 +26,8 @@ fs.ensureDirSync(SHARED_DIR)
 exports.EXTENSIONS = {
   supported: ['pdb', 'sdf', 'cif', 'pdf', 'png', 'jpg', 'nanome', 'nanosr', 'lua', 'obj'],
   extras: ['ccp4', 'dcd', 'dsn6', 'dx', 'gro', 'mae', 'mmcif', 'moe', 'mol2', 'pqr', 'pse', 'psf', 'smiles', 'trr', 'xtc', 'xyz'],
-  converted: ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp']
+  converted: ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp'],
+  external: ['map']
 }
 
 exports.ALL_EXTENSIONS = [].concat(...Object.values(exports.EXTENSIONS))
