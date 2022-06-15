@@ -16,9 +16,10 @@ fi
 
 if [ -z "$(docker ps -qf name=vault-converter)" ]; then
     echo "starting vault-converter"
-    docker run --rm -d \
+    docker run -d \
     --name vault-converter \
     --network vault-network \
+    --restart unless-stopped \
     --env DISABLE_GOOGLE_CHROME=1 \
     --env MAXIMUM_WAIT_TIMEOUT=60 \
     --env DEFAULT_WAIT_TIMEOUT=60 \
@@ -83,8 +84,8 @@ server_container_name="vault-server"
 
 docker run -d \
 --name $plugin_container_name \
---restart unless-stopped \
 --network vault-network \
+--restart unless-stopped \
 -h $(hostname)-$plugin_container_name \
 --env no_proxy=$server_container_name \
 --env NO_PROXY=$server_container_name \
@@ -93,8 +94,8 @@ $plugin_container_name
 
 docker run -d \
 --name $server_container_name \
---restart unless-stopped \
 --network vault-network \
+--restart unless-stopped \
 --env no_proxy=vault-converter \
 --env NO_PROXY=vault-converter \
 ${SERVER_ARGS[@]} \
