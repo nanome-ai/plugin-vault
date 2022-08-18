@@ -17,6 +17,7 @@ LOCK_ICON_PATH = os.path.join(BASE_DIR, 'icons', 'lock.png')
 ACCOUNT_FOLDER = 'account'
 ORG_FOLDER = 'my org'
 
+
 class VaultMenu:
     def __init__(self, plugin: nanome.PluginInstance, address):
         self.plugin = plugin
@@ -276,10 +277,10 @@ class VaultMenu:
         # sort desc for 1 unless sorting by name
         if self.sort_by == 'name':
             reverse = self.sort_order == -1
-            key_fn = lambda x: x[self.sort_by].lower()
+            def key_fn(x): return x[self.sort_by].lower()
         else:
             reverse = self.sort_order == 1
-            key_fn = lambda x: x[self.sort_by]
+            def key_fn(x): return x[self.sort_by]
 
         folders = sorted(items['folders'], key=key_fn, reverse=reverse)
         files = sorted(items['files'], key=key_fn, reverse=reverse)
@@ -287,7 +288,10 @@ class VaultMenu:
         for folder in folders:
             self.add_item(folder, True)
 
+        ignore_ext = self.plugin.extensions['external']
         for file in files:
+            if any(file['name'].endswith('.' + ext) for ext in ignore_ext):
+                continue
             self.add_item(file, False)
 
         self.plugin.update_content(self.lst_files)
