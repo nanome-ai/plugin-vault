@@ -163,10 +163,18 @@ export default {
   },
 
   mounted() {
+    const hideContextOnScroll = () => {
+      if (this.contextmenu.show) {
+        this.hideContextMenu()
+      }
+    }
+
+    window.addEventListener('scroll', hideContextOnScroll, { passive: true })
     this.$root.$on('contextmenu', this.showContextMenu)
     this.$root.$on('download', API.download)
 
     this.$once('hook:beforeDestroy', () => {
+      window.removeEventListener('scroll', hideContextOnScroll)
       this.$root.$off('contextmenu', this.showContextMenu)
       this.$root.$off('download', API.download)
     })
@@ -375,7 +383,8 @@ export default {
       await this.$nextTick()
       const el = this.$refs.contextmenu
       const { pageX, pageY } = e.event
-      const top = Math.min(pageY + 3, innerHeight - el.clientHeight - 10)
+      const maxHeight = innerHeight + document.scrollingElement.scrollTop
+      const top = Math.min(pageY + 3, maxHeight - el.clientHeight - 10)
       const left = Math.min(pageX + 3, innerWidth - el.clientWidth - 10)
       this.contextmenu.top = top + 'px'
       this.contextmenu.left = left + 'px'
