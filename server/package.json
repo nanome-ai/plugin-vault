@@ -6,7 +6,7 @@
   "dependencies": {
     "@nodelib/fs.walk": "^1.2.6",
     "compression": "^1.7.4",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "express-formidable": "^1.2.0",
     "form-data": "^4.0.0",
     "fs-extra": "^9.1.0",
