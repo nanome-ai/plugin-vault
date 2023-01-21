@@ -7,6 +7,8 @@ services:
     env_file:
       - .env
       - .env.plugin
+    volumes:
+     - ./plugin:/app/plugin
   vault-server:
     build:
       context: .
