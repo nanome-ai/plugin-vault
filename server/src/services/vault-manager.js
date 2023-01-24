@@ -17,10 +17,10 @@ const WALK_SETTINGS = new walk.Settings({
 const LOCK_TEXT = 'nanome-vault-lock'
 const FILES_DIR = ospath.join(os.homedir(), 'Documents/nanome-vault')
 const UPLOADS_DIR = ospath.join(os.tmpdir(), 'nanome-vault')
-// fs.ensureDirSync(UPLOADS_DIR)
+fs.ensureDirSync(UPLOADS_DIR)
 
 const SHARED_DIR = ospath.join(FILES_DIR, 'shared')
-// fs.ensureDirSync(SHARED_DIR)
+fs.ensureDirSync(SHARED_DIR)
 
 // prettier-ignore
 exports.EXTENSIONS = {
@@ -46,7 +46,7 @@ exports.addFile = (path, filename, data, key) => {
   // create folder paths
   path = exports.getVaultPath(path, false)
   const subFolder = ospath.join(path, ospath.dirname(filename))
-  // fs.ensureDirSync(subFolder)
+  fs.ensureDirSync(subFolder)
 
   // rename on duplicates: file.txt -> file (n).txt
   const regex = /^(.+[/\\])([^/\\]+?)(?: \((\d+)\))?(\.\w+)$/
