@@ -209,7 +209,7 @@ def create_parser():
         '--internal-url',
         dest='internal_url',
         type=str,
-        default='http://vault-server',
+        default=os.environ.get('INTERNAL_URL', 'http://vault-server'),
         help='URL used for inter-container communication between vault and vault-server')
     vault_group.add_argument(
         '-w', '--web-port',
