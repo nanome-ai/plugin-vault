@@ -11,7 +11,9 @@ const options = {
   cert: fs.readFileSync('./certs/local.crt')
 }
 
-https.createServer(options, app).listen(443)
-http.createServer(app).listen(80)
+https_port = process.env.HTTPS_PORT || 443
+http_port = process.env.HTTP_PORT || 80
+https.createServer(options, app).listen(https_port)
+http.createServer(app).listen(http_port)
 
 cron.init()

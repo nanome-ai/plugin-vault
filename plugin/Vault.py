@@ -12,8 +12,6 @@ from .OBJLoader import OBJLoader
 from .VaultManager import VaultManager
 from . import Workspace
 
-DEFAULT_WEB_PORT = 80
-HTTPS_PORT = 443
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Browse']
 
 # Plugin instance (for Nanome)
@@ -211,7 +209,7 @@ def create_parser():
         '--internal-url',
         dest='internal_url',
         type=str,
-        default='http://vault-server',
+        default=os.environ.get('INTERNAL_URL', 'http://vault-server'),
         help='URL used for inter-container communication between vault and vault-server')
     vault_group.add_argument(
         '-w', '--web-port',
