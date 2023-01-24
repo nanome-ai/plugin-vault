@@ -12,7 +12,6 @@ RUN cd ui && yarn install && yarn build
 
 RUN mkdir -p ${WORKDIR}/Documents/nanome-vault
 RUN mkdir -p ${WORKDIR}/Documents/shared
-RUN chmod +w -R ${WORKDIR}/Documents
-EXPOSE 80 443
+EXPOSE 5000 5001
 
 CMD yarn start ${ARGS}

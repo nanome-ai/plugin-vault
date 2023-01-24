@@ -11,7 +11,7 @@ const options = {
   cert: fs.readFileSync('./certs/local.crt')
 }
 
-https.createServer(options, app).listen(443)
-http.createServer(app).listen(80)
+https.createServer(options, app).listen(5001)
+http.createServer(app).listen(5000)
 
 cron.init()
