@@ -1,5 +1,9 @@
 FROM node:16-alpine
 
+ARG HTTP_PORT=80
+ARG HTTPS_PORT=443
+ENV HTTP_PORT=$HTTP_PORT
+ENV HTTPS_PORT=$HTTPS_PORT
 ENV ARGS=''
 
 WORKDIR /app
@@ -15,10 +19,10 @@ RUN cd ui && yarn install && yarn build
 # Also, in openshift, the home directory for root is /, but in other environments
 # it is /root. So we need to create /Documents, but it's only used in openshift environments.
 ENV DOCS_FOLDER=/Documents
-RUN mkdir -p ${DOCS_FOLDER} && \
-    chgrp -R 0 ${DOCS_FOLDER} && \
-    chmod -R g=u ${DOCS_FOLDER}
+RUN mkdir -p $DOCS_FOLDER && \
+    chgrp -R 0 $DOCS_FOLDER && \
+    chmod -R g=u $DOCS_FOLDER
 
-EXPOSE 5000 5001
+EXPOSE $HTTP_PORT $HTTPS_PORT
 
-CMD yarn start ${ARGS}
+CMD yarn start $ARGS

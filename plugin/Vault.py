@@ -12,8 +12,6 @@ from .OBJLoader import OBJLoader
 from .VaultManager import VaultManager
 from . import Workspace
 
-DEFAULT_WEB_PORT = 5000
-HTTPS_PORT = 5001
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Browse']
 
 # Plugin instance (for Nanome)
