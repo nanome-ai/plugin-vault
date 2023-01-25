@@ -11,8 +11,8 @@ const options = {
   cert: fs.readFileSync('./certs/local.crt')
 }
 
-https_port = process.env.HTTPS_PORT || 443
-http_port = process.env.HTTP_PORT || 80
+const https_port = process.env.HTTPS_PORT || 443
+const http_port = process.env.HTTP_PORT || 80
 https.createServer(options, app).listen(https_port)
 http.createServer(app).listen(http_port)
 
