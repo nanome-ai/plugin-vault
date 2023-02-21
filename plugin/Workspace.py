@@ -12,9 +12,10 @@ dictionary_serializer.set_types(StringField(), ByteField())
 atom_dictionary_serializer = DictionaryField()
 atom_dictionary_serializer.set_types(LongField(), AtomSerializer())
 
+
 def to_data(workspace):
     context = ContextSerialization(0, TypeSerializer.get_version_table())
-    context.write_uint(0) # Version
+    context.write_uint(0)  # Version
     context.write_using_serializer(dictionary_serializer, TypeSerializer.get_version_table())
 
     subcontext = context.create_sub_context()
@@ -24,6 +25,7 @@ def to_data(workspace):
     context.write_bytes(subcontext.to_array())
 
     return zlib.compress(context.to_array())
+
 
 def from_data(data):
     data = zlib.decompress(data)
