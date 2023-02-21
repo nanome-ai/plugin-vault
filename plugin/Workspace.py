@@ -2,7 +2,7 @@ import zlib
 
 from nanome.api.structure.serializers import WorkspaceSerializer, AtomSerializer
 from nanome._internal.network.context import ContextSerialization, ContextDeserialization
-from nanome._internal.serializer_fields import DictionaryField, StringField, ByteField, TypeSerializer, LongSerializer
+from nanome._internal.serializer_fields import DictionaryField, StringField, ByteField, TypeSerializer, LongField
 
 # This package uses undocumented network code, in order to reuse already available serialization code
 
@@ -10,7 +10,7 @@ workspace_serializer = WorkspaceSerializer()
 dictionary_serializer = DictionaryField()
 dictionary_serializer.set_types(StringField(), ByteField())
 atom_dictionary_serializer = DictionaryField()
-atom_dictionary_serializer.set_types(LongSerializer(), AtomSerializer())
+atom_dictionary_serializer.set_types(LongField(), AtomSerializer())
 
 def to_data(workspace):
     context = ContextSerialization(0, TypeSerializer.get_version_table())
