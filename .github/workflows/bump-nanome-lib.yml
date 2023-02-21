@@ -10,7 +10,6 @@ on:
 jobs:
   bump-nanome-lib:
     runs-on: ubuntu-latest
-
     steps:
       - name: Confirm version number is available on PyPi
         run: |
