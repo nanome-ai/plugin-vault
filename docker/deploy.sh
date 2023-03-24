@@ -36,7 +36,11 @@ PORT=
 ARGS=$*
 
 # generate random hex api key
-API_KEY=`od -vN "16" -An -tx1 /dev/urandom | tr -d " \n"`
+if [ ! -f "API_KEY" ]; then
+    echo "generating api key"
+    od -vN "16" -An -tx1 /dev/urandom | tr -d " \n" > "API_KEY"
+fi
+API_KEY=`cat API_KEY`
 
 while [ -n "$1" ]; do
     case $1 in

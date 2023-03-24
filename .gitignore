@@ -3,6 +3,7 @@ node_modules
 dist
 /.vscode
 /docker/.cachebust
+/docker/API_KEY
 /docker/redeploy.sh
 *.log
 .env*
