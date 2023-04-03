@@ -9,12 +9,11 @@ from nanome.util.enums import Integrations, NotificationTypes
 
 from .menus import VaultMenu
 from .OBJLoader import OBJLoader
+from .SceneViewer import SceneViewer
 from .VaultManager import VaultManager
-from . import Workspace
+from . import WorkspaceSerializer
 
 EXPORT_LOCATIONS = ['Workspaces', 'Structures', 'Recordings', 'Pictures', 'Browse']
-
-# Plugin instance (for Nanome)
 
 
 class Vault(nanome.AsyncPluginInstance):
@@ -39,6 +38,7 @@ class Vault(nanome.AsyncPluginInstance):
         self.menu = VaultMenu(self, external_url)
         self.vault = VaultManager(api_key, internal_url)
         self.obj_loader = OBJLoader(self)
+        self.scene_viewer = SceneViewer(self)
         self.extensions = self.vault.get_extensions()
 
     def on_run(self):
@@ -101,11 +101,23 @@ class Vault(nanome.AsyncPluginInstance):
         if extension == 'nanome':
             try:
                 with open(file_path, 'rb') as f:
-                    workspace = Workspace.from_data(f.read())
+                    workspace = WorkspaceSerializer.from_data(f.read())
                     self.update_workspace(workspace)
                 msg = f'Workspace "{item_name}" loaded'
             except:
                 await self.send_files_to_load(file_path)
+
+        # scene viewer
+        elif extension == 'nanoscenes':
+            try:
+                with open(file_path, 'rb') as f:
+                    scenes = WorkspaceSerializer.list_from_data(f.read())
+                self.scene_viewer.load(item_name, scenes)
+                msg = f'Scenes "{item_name}" loaded'
+            except Exception as e:
+                error = f'Scenes: {item_name}" failed to load'
+                self.send_notification(NotificationTypes.error, error)
+                Logs.warning(e)
 
         # macro
         elif extension == 'lua':
