@@ -275,8 +275,8 @@ class SceneViewer:
         self.lst_scenes.items[index].get_content().selected = True
         self.plugin.update_content(self.lst_scenes)
 
-        # update workspace twice to fix a bug where structure color doesn't update
-        self.plugin.update_workspace(self.scenes[index])
+        # clear workspace first to fix a bug where structure color doesn't update
+        self.plugin.update_workspace(Workspace())
         self.plugin.update_workspace(self.scenes[index])
 
     def set_saved(self, saved):
