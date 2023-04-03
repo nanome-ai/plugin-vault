@@ -245,7 +245,7 @@ class SceneViewer:
 
         if response:
             self.plugin.send_notification(NotificationTypes.success, f'"{filename}" saved')
-            self.menu.title = f'Scene Viewer - {name}'
+            self.menu.title = f'Scene Viewer - {name}*'
             self.set_saved(True)
             self.toggle_save(False)
 
