@@ -95,6 +95,7 @@ class SceneViewer:
         btn_add: ui.Button = root.find_node('Button Add').get_content()
         btn_add.register_pressed_callback(self.add_scene)
         btn_add.icon.value.set_all(ICON_ADD)
+        btn_add.disable_on_press = True
 
         btn_delete: ui.Button = root.find_node('Button Delete').get_content()
         btn_delete.register_pressed_callback(self.delete_scene)
@@ -109,6 +110,7 @@ class SceneViewer:
         btn_update: ui.Button = root.find_node('Button Update').get_content()
         btn_update.register_pressed_callback(self.update_scene)
         btn_update.icon.value.set_all(ICON_UPDATE)
+        btn_update.disable_on_press = True
 
         btn_save: ui.Button = root.find_node('Button Save').get_content()
         btn_save.register_pressed_callback(partial(self.toggle_save, True))
@@ -185,6 +187,8 @@ class SceneViewer:
         self.scenes.append(workspace)
         self.update_scenes()
         self.select_scene(-1)
+
+        self.plugin.update_content(btn)
         self.set_saved(False)
         self.update_controls()
 
@@ -192,6 +196,8 @@ class SceneViewer:
         scene = self.scenes[self.selected_index]
         self.scenes.insert(self.selected_index, scene)
         self.selected_index = self.selected_index + 1
+
+        self.plugin.update_content(btn)
         self.update_scenes()
         self.set_saved(False)
 
@@ -199,6 +205,7 @@ class SceneViewer:
         del self.scenes[self.selected_index]
         self.selected_index = max(0, self.selected_index - 1)
         self.update_scenes()
+
         self.plugin.update_content(btn)
         self.set_saved(False)
         self.update_controls()
@@ -312,4 +319,5 @@ class SceneViewer:
     async def update_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
         self.scenes[self.selected_index] = workspace
+        self.plugin.update_content(btn)
         self.set_saved(False)
