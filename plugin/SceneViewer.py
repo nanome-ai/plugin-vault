@@ -4,7 +4,7 @@ from functools import partial
 
 import nanome
 from nanome import ui
-from nanome.api.structure import Workspace
+from nanome.api.structure import Complex, Workspace
 from nanome.util import async_callback
 from nanome.util.enums import NotificationTypes
 
@@ -22,6 +22,7 @@ ICON_FIRST = os.path.join(BASE_DIR, 'icons/first.png')
 ICON_LAST = os.path.join(BASE_DIR, 'icons/last.png')
 ICON_NEW = os.path.join(BASE_DIR, 'icons/new.png')
 ICON_NEXT = os.path.join(BASE_DIR, 'icons/next.png')
+ICON_PASTE = os.path.join(BASE_DIR, 'icons/paste.png')
 ICON_PREV = os.path.join(BASE_DIR, 'icons/prev.png')
 ICON_SAVE = os.path.join(BASE_DIR, 'icons/save.png')
 ICON_UP = os.path.join(BASE_DIR, 'icons/up.png')
@@ -47,6 +48,7 @@ class SceneViewer:
     def __init__(self, plugin: nanome.PluginInstance):
         self.plugin = plugin
         self.scenes: list[Workspace] = []
+        self.clipboard: list[Complex] = []
         self.selected_index = 0
         self.saved = True
         self.create_menu()
@@ -103,9 +105,10 @@ class SceneViewer:
         btn_delete.disable_on_press = True
 
         btn_copy: ui.Button = root.find_node('Button Copy').get_content()
-        btn_copy.register_pressed_callback(self.copy_scene)
-        btn_copy.icon.value.set_all(ICON_COPY)
+        btn_copy.register_pressed_callback(self.copy_selection)
+        btn_copy.icon.value.set_each(default=ICON_COPY, selected=ICON_PASTE)
         btn_copy.disable_on_press = True
+        btn_copy.toggle_on_press = True
 
         btn_update: ui.Button = root.find_node('Button Update').get_content()
         btn_update.register_pressed_callback(self.update_scene)
@@ -129,7 +132,6 @@ class SceneViewer:
         btn_save_continue.register_pressed_callback(self.save)
 
         self.btn_delete = btn_delete
-        self.btn_copy = btn_copy
         self.btn_update = btn_update
         self.inp_scenes_name = inp_scenes_name
         self.btn_save_cancel = btn_save_cancel
@@ -192,20 +194,37 @@ class SceneViewer:
         self.set_saved(False)
         self.update_controls()
 
-    def copy_scene(self, btn=None):
-        scene = self.scenes[self.selected_index]
-        self.scenes.insert(self.selected_index, scene)
-        self.selected_index = self.selected_index + 1
+    @async_callback
+    async def copy_selection(self, btn: ui.Button):
+        workspace = await self.plugin.request_workspace()
+
+        if btn.selected:
+            self.clipboard = [c for c in workspace.complexes if c.get_selected()]
+
+            if not self.clipboard:
+                btn.selected = False
+                self.plugin.update_content(btn)
+                return
+
+            btn.tooltip.title = 'paste selection'
+
+        else:
+            for c in self.clipboard:
+                workspace.add_complex(c)
+
+            self.plugin.update_workspace(Workspace())
+            self.plugin.update_workspace(workspace)
+            btn.tooltip.title = 'copy selection'
+            btn.selected = False
 
         self.plugin.update_content(btn)
-        self.update_scenes()
-        self.set_saved(False)
 
     def delete_scene(self, btn=None):
         del self.scenes[self.selected_index]
         self.selected_index = max(0, self.selected_index - 1)
-        self.update_scenes()
+        self.select_scene(self.selected_index)
 
+        self.update_scenes()
         self.plugin.update_content(btn)
         self.set_saved(False)
         self.update_controls()
@@ -305,15 +324,14 @@ class SceneViewer:
 
     def update_controls(self):
         no_scenes = not self.scenes
-        should_update = self.btn_copy.unusable != no_scenes
+        should_update = self.btn_delete.unusable != no_scenes
 
         if not should_update:
             return
 
-        self.btn_copy.unusable = no_scenes
         self.btn_delete.unusable = no_scenes
         self.btn_update.unusable = no_scenes
-        self.plugin.update_content(self.btn_copy, self.btn_delete, self.btn_update)
+        self.plugin.update_content(self.btn_delete, self.btn_update)
 
     @async_callback
     async def update_scene(self, btn=None):
