@@ -243,6 +243,7 @@ class SceneViewer:
     def move_scene(self, index, offset, btn=None):
         self.scenes.insert(index + offset, self.scenes.pop(index))
         self.selected_index = index + offset
+        self.select_scene(self.selected_index)
         self.update_scenes()
         self.set_saved(False)
 
