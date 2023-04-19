@@ -29,6 +29,10 @@ ICON_UP = os.path.join(BASE_DIR, 'icons/up.png')
 ICON_UPDATE = os.path.join(BASE_DIR, 'icons/update.png')
 ICON_VIEW = os.path.join(BASE_DIR, 'icons/view.png')
 
+CONFIRM_CHANGE_SCENE = 'Change active scene?\nUnsaved scene changes will be lost.'
+CONFIRM_DELETE_SCENE = 'Delete this scene?'
+CONFIRM_RESET = 'Create new scene deck?\nUnsaved deck changes will be lost.'
+
 
 class SaveRequest:
     def __init__(self, name, scenes: 'list[Workspace]'):
@@ -49,6 +53,8 @@ class SceneViewer:
         self.plugin = plugin
         self.scenes: list[Workspace] = []
         self.clipboard: list[Complex] = []
+        self.pending_action = None
+        self.edit_mode = False
         self.selected_index = 0
         self.saved = True
         self.create_menu()
@@ -58,10 +64,19 @@ class SceneViewer:
         self.menu.index = 2
         root: ui.LayoutNode = self.menu.root
 
-        self.pfb_scene_item = nanome.ui.LayoutNode.io.from_json(SCENE_ITEM_PATH)
+        self.pfb_scene_item = ui.LayoutNode.io.from_json(SCENE_ITEM_PATH)
 
         self.ln_scenes: ui.LayoutNode = root.find_node('Scenes')
         self.ln_save: ui.LayoutNode = root.find_node('Save')
+
+        self.ln_confirm: ui.LayoutNode = root.find_node('Confirm Prompt')
+        self.lbl_confirm: ui.Label = root.find_node('Label Confirm').get_content()
+
+        self.btn_confirm_cancel: ui.Button = root.find_node('Button Confirm Cancel').get_content()
+        self.btn_confirm_cancel.register_pressed_callback(self.confirm_cancel)
+
+        self.btn_confirm_continue: ui.Button = root.find_node('Button Confirm Continue').get_content()
+        self.btn_confirm_continue.register_pressed_callback(self.confirm_continue)
 
         ln_list: ui.LayoutNode = root.find_node('Scene List')
         self.lst_scenes: ui.UIList = ln_list.get_content()
@@ -144,8 +159,27 @@ class SceneViewer:
         self.menu.enabled = True
         self.plugin.update_menu(self.menu)
 
+    def confirm(self, msg, action):
+        self.ln_confirm.enabled = True
+        self.lbl_confirm.text_value = msg
+        self.pending_action = action
+        self.plugin.update_node(self.ln_confirm)
+
+    def confirm_cancel(self, btn):
+        self.ln_confirm.enabled = False
+        self.pending_action = None
+        self.plugin.update_node(self.ln_confirm)
+
+    def confirm_continue(self, btn):
+        self.ln_confirm.enabled = False
+        self.pending_action()
+        self.pending_action = None
+        self.plugin.update_node(self.ln_confirm)
+
     def update_scenes(self):
+        self.lst_scenes.display_rows = 5 if self.edit_mode else 6
         self.lst_scenes.items.clear()
+
         for i in range(len(self.scenes)):
             ln_item: ui.LayoutNode = self.pfb_scene_item.clone()
 
@@ -167,6 +201,9 @@ class SceneViewer:
             btn_down.disable_on_press = True
             btn_down.unusable = i == len(self.scenes) - 1
 
+            ln_btns_move: ui.LayoutNode = ln_item.find_node('Buttons Move')
+            ln_btns_move.enabled = self.edit_mode
+
             self.lst_scenes.items.append(ln_item)
 
         if not self.lst_scenes.items:
@@ -186,9 +223,10 @@ class SceneViewer:
     @async_callback
     async def add_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
-        self.scenes.append(workspace)
+        index = self.selected_index + 1
+        self.scenes.insert(index, workspace)
         self.update_scenes()
-        self.select_scene(-1)
+        self.select_scene(min(index, len(self.scenes) - 1))
 
         self.plugin.update_content(btn)
         self.set_saved(False)
@@ -220,6 +258,11 @@ class SceneViewer:
         self.plugin.update_content(btn)
 
     def delete_scene(self, btn=None):
+        if not self.pending_action:
+            action = partial(self.delete_scene, btn)
+            self.confirm(CONFIRM_DELETE_SCENE, action)
+            return
+
         del self.scenes[self.selected_index]
         self.selected_index = max(0, self.selected_index - 1)
         self.select_scene(self.selected_index)
@@ -252,6 +295,10 @@ class SceneViewer:
         self.set_saved(False)
 
     def reset(self, btn=None):
+        if not self.pending_action:
+            self.confirm(CONFIRM_RESET, self.reset)
+            return
+
         self.scenes.clear()
         self.selected_index = 0
         self.inp_scenes_name.input_text = ''
@@ -284,11 +331,21 @@ class SceneViewer:
         if not self.scenes:
             return
 
+        if btn is not None and self.edit_mode:
+            action = partial(self.select_adjacent_scene, offset)
+            self.confirm(CONFIRM_CHANGE_SCENE, action)
+            return
+
         index = (self.selected_index + offset) % len(self.scenes)
         self.select_scene(index)
 
     def select_scene(self, index, btn=None):
         if not self.scenes:
+            return
+
+        if btn is not None and self.edit_mode:
+            action = partial(self.select_scene, index)
+            self.confirm(CONFIRM_CHANGE_SCENE, action)
             return
 
         if index < 0:
@@ -315,11 +372,12 @@ class SceneViewer:
             self.plugin.update_menu(self.menu)
 
     def toggle_edit_mode(self, edit_mode, btn=None):
+        self.edit_mode = edit_mode
         self.ln_btn_edit.enabled = not edit_mode
         self.ln_btn_view.enabled = edit_mode
         self.ln_btns_edit.enabled = edit_mode
         self.plugin.update_node(self.ln_btn_edit, self.ln_btn_view, self.ln_btns_edit)
-        self.plugin.update_content(self.lst_scenes)
+        self.update_scenes()
         self.update_controls()
 
     def toggle_save(self, value, btn=None):
