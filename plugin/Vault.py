@@ -85,6 +85,9 @@ class Vault(nanome.AsyncPluginInstance):
         else:
             self.menu.update()
 
+    def on_complex_list_changed(self):
+        self.scene_viewer.on_scene_changed()
+
     async def load_file(self, name):
         item_name, extension = name.rsplit('.', 1)
 
@@ -101,7 +104,7 @@ class Vault(nanome.AsyncPluginInstance):
         if extension == 'nanome':
             try:
                 with open(file_path, 'rb') as f:
-                    workspace = WorkspaceSerializer.from_data(f.read())
+                    workspace = WorkspaceSerializer.workspace_from_data(f.read())
                     self.update_workspace(workspace)
                 msg = f'Workspace "{item_name}" loaded'
             except:
@@ -111,7 +114,7 @@ class Vault(nanome.AsyncPluginInstance):
         elif extension == 'nanoscenes':
             try:
                 with open(file_path, 'rb') as f:
-                    scenes = WorkspaceSerializer.list_from_data(f.read())
+                    scenes = WorkspaceSerializer.scenes_from_data(f.read())
                 self.scene_viewer.load(item_name, scenes)
                 msg = f'Scenes "{item_name}" loaded'
             except Exception as e:

@@ -9,9 +9,11 @@ from nanome.util import async_callback
 from nanome.util.enums import NotificationTypes
 
 from . import WorkspaceSerializer
+from .WorkspaceSerializer import Scene
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'menus')
 MENU_PATH = os.path.join(BASE_DIR, 'json/scenes_menu.json')
+SCENE_INFO_PATH = os.path.join(BASE_DIR, 'json/scene_info.json')
 SCENE_ITEM_PATH = os.path.join(BASE_DIR, 'json/scene_item.json')
 ICON_ADD = os.path.join(BASE_DIR, 'icons/add.png')
 ICON_COPY = os.path.join(BASE_DIR, 'icons/copy.png')
@@ -35,9 +37,9 @@ CONFIRM_RESET = 'Create new scene deck?\nUnsaved deck changes will be lost.'
 
 
 class SaveRequest:
-    def __init__(self, name, scenes: 'list[Workspace]'):
+    def __init__(self, name, scenes: 'list[Scene]'):
         self.name = name
-        self.data = WorkspaceSerializer.list_to_data(scenes)
+        self.data = WorkspaceSerializer.scenes_to_data(scenes)
         loop = asyncio.get_event_loop()
         self.future = loop.create_future()
 
@@ -51,13 +53,19 @@ class SaveRequest:
 class SceneViewer:
     def __init__(self, plugin: nanome.PluginInstance):
         self.plugin = plugin
-        self.scenes: list[Workspace] = []
+        self.scenes: list[Scene] = []
         self.clipboard: list[Complex] = []
+
         self.pending_action = None
         self.edit_mode = False
         self.selected_index = 0
         self.saved = True
+        self.scene_changes = False
+
         self.create_menu()
+        self.create_scene_menu()
+        self.update_scenes()
+        self.toggle_edit_mode(True)
 
     def create_menu(self):
         self.menu = ui.Menu.io.from_json(MENU_PATH)
@@ -142,9 +150,11 @@ class SceneViewer:
 
         btn_save_cancel: ui.Button = root.find_node('Button Save Cancel').get_content()
         btn_save_cancel.register_pressed_callback(partial(self.toggle_save, False))
+        btn_save_cancel.disable_on_press = True
 
         btn_save_continue: ui.Button = root.find_node('Button Save Continue').get_content()
         btn_save_continue.register_pressed_callback(self.save)
+        btn_save_continue.disable_on_press = True
 
         self.btn_delete = btn_delete
         self.btn_update = btn_update
@@ -152,12 +162,27 @@ class SceneViewer:
         self.btn_save_cancel = btn_save_cancel
         self.btn_save_continue = btn_save_continue
 
-        self.update_scenes()
-        self.toggle_edit_mode(True)
+    def create_scene_menu(self):
+        self.menu_scene = ui.Menu.io.from_json(SCENE_INFO_PATH)
+        self.menu_scene.index = 3
+        root: ui.LayoutNode = self.menu_scene.root
+
+        self.ln_info_view: ui.LayoutNode = root.find_node('Info View')
+        self.ln_info_edit: ui.LayoutNode = root.find_node('Info Edit')
+
+        self.lbl_scene_name: ui.Label = root.find_node('Label Name').get_content()
+        self.lbl_scene_description: ui.Label = root.find_node('Label Description').get_content()
+
+        self.inp_scene_name: ui.TextInput = root.find_node('Input Name').get_content()
+        self.inp_scene_name.register_changed_callback(self.update_scene_name)
+        self.inp_scene_description: ui.TextInput = root.find_node('Input Description').get_content()
+        self.inp_scene_description.register_changed_callback(self.update_scene_description)
 
     def open_menu(self):
         self.menu.enabled = True
+        self.menu_scene.enabled = True
         self.plugin.update_menu(self.menu)
+        self.plugin.update_menu(self.menu_scene)
 
     def confirm(self, msg, action):
         self.ln_confirm.enabled = True
@@ -180,14 +205,14 @@ class SceneViewer:
         self.lst_scenes.display_rows = 5 if self.edit_mode else 6
         self.lst_scenes.items.clear()
 
-        for i in range(len(self.scenes)):
+        for i, scene in enumerate(self.scenes):
             ln_item: ui.LayoutNode = self.pfb_scene_item.clone()
 
             btn: ui.Button = ln_item.get_content()
             btn.register_pressed_callback(partial(self.select_scene, i))
 
             lbl: ui.Label = ln_item.find_node('Label').get_content()
-            lbl.text_value = f'Scene {i + 1}'
+            lbl.text_value = scene.name or f'Scene {i + 1}'
 
             btn_up: ui.Button = ln_item.find_node('Button Move Up').get_content()
             btn_up.register_pressed_callback(partial(self.move_scene, i, -1))
@@ -223,8 +248,9 @@ class SceneViewer:
     @async_callback
     async def add_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
+        scene = Scene(workspace)
         index = self.selected_index + 1
-        self.scenes.insert(index, workspace)
+        self.scenes.insert(index, scene)
         self.update_scenes()
         self.select_scene(min(index, len(self.scenes) - 1))
 
@@ -254,6 +280,7 @@ class SceneViewer:
             self.plugin.update_workspace(workspace)
             btn.tooltip.title = 'copy selection'
             btn.selected = False
+            self.on_scene_changed()
 
         self.plugin.update_content(btn)
 
@@ -272,7 +299,7 @@ class SceneViewer:
         self.set_saved(False)
         self.update_controls()
 
-    def load(self, filename, scenes: 'list[Workspace]'):
+    def load(self, filename, scenes: 'list[Scene]'):
         self.scenes = scenes
         self.selected_index = 0
         name = filename.replace('.nanoscenes', '')
@@ -292,6 +319,12 @@ class SceneViewer:
 
         self.selected_index = new_index
         self.update_scenes()
+        self.set_saved(False)
+
+    def on_scene_changed(self, *_):
+        if not self.edit_mode:
+            return
+        self.scene_changes = True
         self.set_saved(False)
 
     def reset(self, btn=None):
@@ -331,7 +364,7 @@ class SceneViewer:
         if not self.scenes:
             return
 
-        if btn is not None and self.edit_mode:
+        if btn is not None and self.edit_mode and self.scene_changes:
             action = partial(self.select_adjacent_scene, offset)
             self.confirm(CONFIRM_CHANGE_SCENE, action)
             return
@@ -339,11 +372,12 @@ class SceneViewer:
         index = (self.selected_index + offset) % len(self.scenes)
         self.select_scene(index)
 
-    def select_scene(self, index, btn=None):
+    @async_callback
+    async def select_scene(self, index, btn=None):
         if not self.scenes:
             return
 
-        if btn is not None and self.edit_mode:
+        if btn is not None and self.edit_mode and self.scene_changes:
             action = partial(self.select_scene, index)
             self.confirm(CONFIRM_CHANGE_SCENE, action)
             return
@@ -357,8 +391,22 @@ class SceneViewer:
         self.plugin.update_content(self.lst_scenes)
 
         # clear workspace first to fix a bug where structure color doesn't update
+        scene = self.scenes[index]
         self.plugin.update_workspace(Workspace())
-        self.plugin.update_workspace(self.scenes[index])
+        self.plugin.update_workspace(scene.workspace)
+
+        self.lbl_scene_name.text_value = scene.name or f'Scene {index + 1}'
+        self.lbl_scene_description.text_value = scene.description or 'No description'
+        self.inp_scene_name.input_text = scene.name
+        self.inp_scene_description.input_text = scene.description
+        self.plugin.update_menu(self.menu_scene)
+
+        complexes = await self.plugin.request_complex_list()
+        for complex in complexes:
+            complex.register_complex_updated_callback(self.on_scene_changed)
+            complex.register_selection_changed_callback(self.on_scene_changed)
+
+        self.scene_changes = False
 
     def set_saved(self, saved):
         self.saved = saved
@@ -368,15 +416,27 @@ class SceneViewer:
             self.menu.title = self.menu.title[:-1]
         elif not saved and not shows_unsaved:
             self.menu.title += '*'
-        if saved == shows_unsaved:
+        if saved == shows_unsaved and self.menu.enabled:
             self.plugin.update_menu(self.menu)
 
     def toggle_edit_mode(self, edit_mode, btn=None):
         self.edit_mode = edit_mode
+
         self.ln_btn_edit.enabled = not edit_mode
         self.ln_btn_view.enabled = edit_mode
         self.ln_btns_edit.enabled = edit_mode
         self.plugin.update_node(self.ln_btn_edit, self.ln_btn_view, self.ln_btns_edit)
+
+        self.ln_info_view.enabled = not edit_mode
+        self.ln_info_edit.enabled = edit_mode
+
+        if self.scenes:
+            scene = self.scenes[self.selected_index]
+            self.lbl_scene_name.text_value = scene.name or f'Scene {self.selected_index + 1}'
+            self.lbl_scene_description.text_value = scene.description or 'No description'
+
+        self.plugin.update_node(self.ln_info_view, self.ln_info_edit)
+
         self.update_scenes()
         self.update_controls()
 
@@ -399,6 +459,16 @@ class SceneViewer:
     @async_callback
     async def update_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
-        self.scenes[self.selected_index] = workspace
+        self.scenes[self.selected_index].workspace = workspace
         self.plugin.update_content(btn)
+        self.set_saved(False)
+        self.scene_changes = False
+
+    def update_scene_name(self, inp=None):
+        self.scenes[self.selected_index].name = inp.input_text
+        self.update_scenes()
+        self.set_saved(False)
+
+    def update_scene_description(self, inp=None):
+        self.scenes[self.selected_index].description = inp.input_text
         self.set_saved(False)
