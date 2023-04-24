@@ -343,6 +343,9 @@ class SceneViewer:
         self.update_controls()
         self.open_menu()
 
+        self.menu_scene.enabled = False
+        self.plugin.update_menu(self.menu_scene)
+
     @async_callback
     async def save(self, btn=None):
         name = self.inp_scenes_name.input_text
