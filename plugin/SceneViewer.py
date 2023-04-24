@@ -180,8 +180,10 @@ class SceneViewer:
 
     def open_menu(self):
         self.menu.enabled = True
-        self.menu_scene.enabled = True
         self.plugin.update_menu(self.menu)
+
+    def open_scene_menu(self):
+        self.menu_scene.enabled = True
         self.plugin.update_menu(self.menu_scene)
 
     def confirm(self, msg, action):
@@ -407,6 +409,7 @@ class SceneViewer:
             complex.register_selection_changed_callback(self.on_scene_changed)
 
         self.scene_changes = False
+        self.open_scene_menu()
 
     def set_saved(self, saved):
         self.saved = saved
