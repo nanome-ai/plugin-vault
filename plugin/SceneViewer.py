@@ -411,8 +411,12 @@ class SceneViewer:
             complex.register_complex_updated_callback(self.on_scene_changed)
             complex.register_selection_changed_callback(self.on_scene_changed)
 
-        self.scene_changes = False
         self.open_scene_menu()
+
+        # ignore updates 1 second after scene change
+        self.scene_changes = False
+        await asyncio.sleep(1)
+        self.scene_changes = False
 
     def set_saved(self, saved):
         self.saved = saved
