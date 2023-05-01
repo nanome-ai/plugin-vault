@@ -451,11 +451,11 @@ class VaultMenu:
         self.lbl_loading.text_value = f'loading...\n{n} item{"s" if n > 1 else ""}'
         self.plugin.update_node(self.ln_explorer)
 
-        load_requests = []
+        load_items = []
         for btn in self.selected_items:
-            load_requests.append(self.plugin.load_file(btn.item_name))
+            load_items.append(btn.item_name)
             btn.selected = False
-        await asyncio.gather(*load_requests)
+        await self.plugin.load_files(load_items)
 
         self.selected_items = []
         self.lst_files.parent.enabled = True
