@@ -85,14 +85,13 @@ class Vault(nanome.AsyncPluginInstance):
         else:
             self.menu.update()
 
-    async def load_file(self, name):
+    async def load_or_queue_file(self, temp_dir, name, out_queue):
         item_name, extension = name.rsplit('.', 1)
 
         path = os.path.join(self.menu.path, name)
         key = self.menu.folder_key
 
-        temp = tempfile.TemporaryDirectory()
-        file_path = os.path.join(temp.name, name)
+        file_path = os.path.join(temp_dir.name, name)
         self.vault.get_file(path, key, file_path)
 
         msg = None
@@ -105,7 +104,7 @@ class Vault(nanome.AsyncPluginInstance):
                     self.update_workspace(workspace)
                 msg = f'Workspace "{item_name}" loaded'
             except:
-                await self.send_files_to_load(file_path)
+                out_queue.append(file_path)
 
         # macro
         elif extension == 'lua':
@@ -121,7 +120,7 @@ class Vault(nanome.AsyncPluginInstance):
             for ext in ['.png', '.jpg', '.jpeg']:
                 tex_name = f'{item_name}{ext}'
                 tex_in = os.path.join(self.menu.path, tex_name)
-                tex_out = os.path.join(temp.name, tex_name)
+                tex_out = os.path.join(temp_dir.name, tex_name)
                 if self.vault.get_file(tex_in, key, tex_out):
                     tex_path = tex_out
                     break
@@ -134,7 +133,7 @@ class Vault(nanome.AsyncPluginInstance):
                 Logs.warning(e)
 
         elif extension in self.extensions['supported'] + self.extensions['extras']:
-            await self.send_files_to_load(file_path)
+            out_queue.append(file_path)
 
         else:
             error = f'Extension not yet supported: {extension}'
@@ -143,6 +142,16 @@ class Vault(nanome.AsyncPluginInstance):
 
         if msg is not None:
             self.send_notification(NotificationTypes.success, msg)
+
+    async def load_files(self, names):
+        temp = tempfile.TemporaryDirectory()
+        send_files = []
+
+        for name in names:
+            await self.load_or_queue_file(temp, name, send_files)
+
+        if send_files:
+            self.send_files_to_load(send_files)
 
         temp.cleanup()
 
