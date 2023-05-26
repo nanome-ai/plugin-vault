@@ -170,12 +170,14 @@ class SceneViewer:
 
         self.inp_scene_name: ui.TextInput = self.ln_info.find_node('Input Name').get_content()
         self.inp_scene_desc: ui.TextInput = self.ln_info.find_node('Input Description').get_content()
+        self.inp_scene_desc.register_changed_callback(self.update_scene_desc_len)
+        self.lbl_scene_desc_len: ui.Label = self.ln_info.find_node('Label Description Length').get_content()
 
         btn_info_cancel: ui.Button = self.ln_info.find_node('Button Cancel').get_content()
         btn_info_cancel.register_pressed_callback(self.toggle_scene_info)
 
-        btn_info_save: ui.Button = self.ln_info.find_node('Button Save').get_content()
-        btn_info_save.register_pressed_callback(self.save_scene_info)
+        btn_info_update: ui.Button = self.ln_info.find_node('Button Update').get_content()
+        btn_info_update.register_pressed_callback(self.save_scene_info)
 
     def create_scene_menu(self):
         self.menu_scene = ui.Menu.io.from_json(SCENE_INFO_PATH)
@@ -243,9 +245,9 @@ class SceneViewer:
             btn_update.icon.value.set_all(ICON_UPDATE)
             btn_update.disable_on_press = True
 
-            btn_info: ui.Button = ln_btns_edit.find_node('Button Info').get_content()
-            btn_info.register_pressed_callback(self.toggle_scene_info)
-            btn_info.icon.value.set_all(ICON_INFO)
+            btn_notes: ui.Button = ln_btns_edit.find_node('Button Notes').get_content()
+            btn_notes.register_pressed_callback(self.toggle_scene_info)
+            btn_notes.icon.value.set_all(ICON_INFO)
 
             btn_delete: ui.Button = ln_btns_edit.find_node('Button Delete').get_content()
             btn_delete.register_pressed_callback(self.delete_scene)
@@ -488,6 +490,10 @@ class SceneViewer:
         self.set_saved(False)
         self.scene_changes = False
 
+    def update_scene_desc_len(self, inp=None):
+        self.lbl_scene_desc_len.text_value = f'{len(self.inp_scene_desc.input_text)}/500'
+        self.plugin.update_content(self.lbl_scene_desc_len)
+
     def update_scene_info(self):
         name = 'No scenes'
         desc = 'Add a new scene or load a Scene Deck to get started'
@@ -504,3 +510,4 @@ class SceneViewer:
 
         self.plugin.update_content(self.inp_scene_name, self.inp_scene_desc)
         self.plugin.update_content(self.lbl_scene_name, self.lbl_scene_desc)
+        self.update_scene_desc_len()
