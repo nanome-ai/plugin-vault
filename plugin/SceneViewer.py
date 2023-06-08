@@ -68,6 +68,7 @@ class SceneViewer:
     def create_menu(self):
         self.menu = ui.Menu.io.from_json(MENU_PATH)
         self.menu.index = 2
+        self.menu.enabled = False
         root: ui.LayoutNode = self.menu.root
 
         self.pfb_scene_item = ui.LayoutNode.io.from_json(SCENE_ITEM_PATH)
