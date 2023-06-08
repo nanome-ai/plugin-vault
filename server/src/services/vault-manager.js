@@ -24,7 +24,7 @@ fs.ensureDirSync(SHARED_DIR)
 
 // prettier-ignore
 exports.EXTENSIONS = {
-  supported: ['pdb', 'sdf', 'cif', 'pdf', 'png', 'jpg', 'nanome', 'nanosr', 'lua', 'obj'],
+  supported: ['pdb', 'sdf', 'cif', 'pdf', 'png', 'jpg', 'nanome', 'nanoscenes', 'nanosr', 'lua', 'obj'],
   extras: ['ccp4', 'dcd', 'dsn6', 'dx', 'gro', 'mae', 'mmcif', 'moe', 'mol2', 'pqr', 'pse', 'psf', 'smiles', 'trr', 'xtc', 'xyz'],
   converted: ['ppt', 'pptx', 'doc', 'docx', 'txt', 'rtf', 'odt', 'odp'],
   external: ['csv', 'map', 'map.gz']
