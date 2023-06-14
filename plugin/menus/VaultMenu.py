@@ -9,10 +9,11 @@ from nanome.util import async_callback, Color
 from nanome.util.enums import ExportFormats
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
-MENU_PATH = os.path.join(BASE_DIR, 'json', 'menu.json')
-LIST_ITEM_PATH = os.path.join(BASE_DIR, 'json', 'list_item.json')
-UP_ICON_PATH = os.path.join(BASE_DIR, 'icons', 'up.png')
-LOCK_ICON_PATH = os.path.join(BASE_DIR, 'icons', 'lock.png')
+MENU_PATH = os.path.join(BASE_DIR, 'json/menu.json')
+LIST_ITEM_PATH = os.path.join(BASE_DIR, 'json/list_item.json')
+ICON_LOCK = os.path.join(BASE_DIR, 'icons/lock.png')
+ICON_SORT = os.path.join(BASE_DIR, 'icons/sort.png')
+ICON_UP = os.path.join(BASE_DIR, 'icons/up.png')
 
 ACCOUNT_FOLDER = 'account'
 ORG_FOLDER = 'my org'
@@ -61,7 +62,7 @@ class VaultMenu:
 
         self.btn_up.unusable = True
         self.btn_up.icon.active = True
-        self.btn_up.icon.value.set_all(UP_ICON_PATH)
+        self.btn_up.icon.value.set_all(ICON_UP)
         self.btn_up.icon.size = 0.5
         self.btn_up.icon.color.unusable = Color.Grey()
 
@@ -120,7 +121,7 @@ class VaultMenu:
         for sort in ['Name', 'Size', 'Date Added']:
             btn = self.ln_actions_panel.find_node(sort).get_content()
             btn.register_pressed_callback(self.change_sort)
-            btn.icon.value.set_all(UP_ICON_PATH)
+            btn.icon.value.set_all(ICON_SORT)
             btn.icon.rotation.z = 180
 
         btn = self.ln_actions_panel.find_node('Name').get_content()
@@ -306,6 +307,7 @@ class VaultMenu:
 
         self.lst_actions.items.clear()
         self.lst_actions.items.append(make_action('Open Website'))
+        self.lst_actions.items.append(make_action('Open Scene Viewer'))
 
         if self.plugin.obj_loader.objs:
             self.lst_actions.items.append(make_action('Manage OBJs'))
@@ -378,7 +380,7 @@ class VaultMenu:
 
         if is_folder and name in self.locked_folders:
             btn.icon.active = True
-            btn.icon.value.set_all(LOCK_ICON_PATH)
+            btn.icon.value.set_all(ICON_LOCK)
             btn.icon.size = 0.5
             btn.icon.position.x = 0.9
 
@@ -467,8 +469,12 @@ class VaultMenu:
             url = f'{self.address}/{path}'
             self.plugin.open_url(url)
             self.toggle_actions()
+        elif button.name == 'Open Scene Viewer':
+            self.plugin.scene_viewer.open_menu()
+            self.toggle_actions()
         elif button.name == 'Manage OBJs':
             self.plugin.obj_loader.show_list()
+            self.toggle_actions()
         elif button.name == 'Upload Here':
             self.toggle_upload()
             self.toggle_actions()
