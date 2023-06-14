@@ -5,6 +5,7 @@ function replacePath(path) {
   return path
     .replace(/^\/account($|\/)/, `/${store.state.unique}$1`)
     .replace(/^\/my-org($|\/)/, `/${store.state.org}$1`)
+    .replace(/[#?]/g, '_')
 }
 
 function addSlash(path) {

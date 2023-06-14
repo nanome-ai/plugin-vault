@@ -18,7 +18,7 @@ router.get('/info', (req, res) => {
 })
 
 router.get('/files(/*)?', auth, (req, res) => {
-  let path = decodeURI(req.path).slice(7)
+  const path = decodeURI(req.path).slice(7)
 
   const key = req.headers['vault-key']
   if (!Vault.isKeyValid(path, key)) {
@@ -39,7 +39,7 @@ router.post(
   '/files(/*)?',
   auth,
   asyncWrap(async (req, res) => {
-    let path = decodeURI(req.path).slice(7)
+    const path = decodeURI(req.path).slice(7)
     const { command, folder, name, key } = req.fields
 
     const needsKey = [

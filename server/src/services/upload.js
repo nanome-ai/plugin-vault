@@ -66,7 +66,7 @@ const uploadChunk = async (headers, chunk) => {
 }
 
 const finalizeUpload = async (filename, filepath, path, key) => {
-  let name = filename
+  let name = filename.replace(/[#?]/g, '_')
   const split = name.split('.')
   const ext = split.pop().toLowerCase()
   const base = split.join('.')

@@ -185,7 +185,7 @@ exports.getLockedPath = path => {
 
 // return full path of item in vault
 exports.getVaultPath = (subPath, enforceExists) => {
-  const path = ospath.join(FILES_DIR, subPath || '')
+  const path = ospath.join(FILES_DIR, subPath || '').replace(/[#?]/g, '_')
   if (!exports.isSafePath(path, undefined, enforceExists)) {
     throw HTTPError.NOT_FOUND
   }
@@ -299,7 +299,7 @@ exports.movePath = (path, folder) => {
 exports.renamePath = (path, name) => {
   const oldPath = exports.getVaultPath(path)
   const dir = ospath.dirname(oldPath)
-  const newPath = ospath.join(dir, name)
+  const newPath = ospath.join(dir, name.replace(/[#?]/g, '_'))
 
   if (fs.existsSync(newPath)) {
     throw new HTTPError(400, 'Path already exists')
