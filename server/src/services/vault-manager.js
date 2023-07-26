@@ -227,7 +227,7 @@ exports.listPath = path => {
   path = exports.getVaultPath(path)
 
   const result = {
-    locked_path: exports.getLockedPath(path),
+    locked_path: '/' + exports.getLockedPath(path),
     locked: [],
     folders: [],
     files: []

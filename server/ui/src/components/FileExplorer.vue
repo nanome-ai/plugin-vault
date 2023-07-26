@@ -139,7 +139,7 @@ export default {
 
     moveDestinations() {
       const { isFolder } = this.menuOptions
-      const { folders, path } = this.contextmenu
+      const { folders, key_path, path } = this.contextmenu
 
       const split = path.split('/')
       const parts = isFolder ? -2 : -1
@@ -154,7 +154,8 @@ export default {
           value: base + f.name
         }))
 
-      if (parent !== '/') {
+      const isMovingOutsideLock = key_path === base
+      if (parent !== '/' && !isMovingOutsideLock) {
         items.unshift({ label: '.. (parent)', value: parent })
       }
 

@@ -69,7 +69,7 @@ export default {
         event,
         path: this.path + item,
         locked: this.isLocked(item),
-        folders: this.folders,
+        folders: this.folders.filter(f => !this.encrypted.includes(f.name)),
         encrypted,
         key_path: this.key_path,
         component: this
