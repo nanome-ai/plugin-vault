@@ -225,9 +225,10 @@ exports.isSafePath = (subPath, basePath = FILES_DIR, enforceExists = true) => {
 // list files, folders, and locked folders in path
 exports.listPath = path => {
   path = exports.getVaultPath(path)
+  const locked_path = exports.getLockedPath(path)
 
   const result = {
-    locked_path: '/' + exports.getLockedPath(path),
+    locked_path: locked_path && `/${locked_path}`,
     locked: [],
     folders: [],
     files: []
