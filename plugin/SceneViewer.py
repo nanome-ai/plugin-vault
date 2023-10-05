@@ -445,9 +445,10 @@ class SceneViewer:
         await asyncio.sleep(1)
         shallow_comps = await self.plugin.request_complex_list()
         updated_complexes = await self.plugin.request_complexes([cmp.index for cmp in shallow_comps])
+        if scene.interactions:
+            updated_interactions = self.update_interaction_lines(scene.interactions, scene.workspace.complexes, updated_complexes)
+            await Interaction.upload_multiple(updated_interactions)
 
-        updated_interactions = self.update_interaction_lines(scene.interactions, scene.workspace.complexes, updated_complexes)
-        await Interaction.upload_multiple(updated_interactions)
         for complex in updated_complexes:
             complex.register_complex_updated_callback(self.on_scene_changed)
             complex.register_selection_changed_callback(self.on_scene_changed)
@@ -528,27 +529,18 @@ class SceneViewer:
         
         This is a workaround for the fact that atom indices change every time a workspace
         is reloaded into the room.
-
-        We 
         """
         updated_interactions = []
         atom_index_map = {}
         og_atoms = itertools.chain(*[cmp.atoms for cmp in original_complexes])
         updated_atoms = itertools.chain(*[cmp.atoms for cmp in updated_complexes])
+        # We are making the assumption that the og complex and updated complex
+        # are the same, so we can just zip the atoms together and they align.
         for og_atom, updated_atom in zip(og_atoms, updated_atoms):
-            assert og_atom.symbol == updated_atom.symbol
             atom_index_map[og_atom.index] = updated_atom.index
         for interaction in interaction_list:
-            atom1_idx_arr = []
-            atom2_idx_arr = []
-            for og_atom_index in interaction.atom1_idx_arr:
-                updated_atom_index = atom_index_map[og_atom_index]
-                atom1_idx_arr.append(updated_atom_index)
-            for og_atom_index in interaction.atom2_idx_arr:
-                updated_atom_index = atom_index_map[og_atom_index]
-                atom2_idx_arr.append(updated_atom_index)
+            interaction.atom1_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom1_idx_arr))
+            interaction.atom2_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom2_idx_arr))
             interaction.index = -1
-            interaction.atom1_idx_arr = tuple(atom1_idx_arr)
-            interaction.atom2_idx_arr = tuple(atom2_idx_arr)
             updated_interactions.append(interaction)
         return updated_interactions

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 from nanome.api.interactions import Interaction
+from nanome.api.interactions.serializers import InteractionSerializer
 from nanome.api.structure import Workspace
 from nanome.api.structure.serializers import WorkspaceSerializer, AtomSerializer
 from nanome._internal.network.context import ContextSerialization, ContextDeserialization
@@ -17,6 +18,9 @@ dictionary_serializer = DictionaryField()
 dictionary_serializer.set_types(StringField(), ByteField())
 atom_dictionary_serializer = DictionaryField()
 atom_dictionary_serializer.set_types(LongField(), AtomSerializer())
+
+interaction_array_serializer = ArrayField()
+interaction_array_serializer.set_type(InteractionSerializer)
 
 
 @dataclass
@@ -48,12 +52,14 @@ class SceneSerializer:
         context.write_using_serializer(string_serializer, value.name)
         context.write_using_serializer(string_serializer, value.description)
         context.write_using_serializer(vault_workspace_serializer, value.workspace)
+        context.write_using_serializer(ArrayField(), value.interactions)
 
     def deserialize(self, version, context):
         name = context.read_using_serializer(string_serializer)
         description = context.read_using_serializer(string_serializer)
         workspace = context.read_using_serializer(vault_workspace_serializer)
-        return Scene(workspace, name, description)
+        interactions = context.read_using_serializer(interaction_array_serializer) 
+        return Scene(workspace, name, description, interactions)
 
 
 scene_serializer = SceneSerializer()
