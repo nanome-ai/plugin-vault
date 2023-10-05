@@ -1,9 +1,10 @@
 import asyncio
+from dataclasses import field
 import os
 from functools import partial
-
 import nanome
 from nanome import ui
+from nanome.api.interactions import Interaction
 from nanome.api.structure import Complex, Workspace
 from nanome.util import async_callback
 from nanome.util.enums import NotificationTypes
@@ -278,7 +279,8 @@ class SceneViewer:
     @async_callback
     async def add_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
-        scene = Scene(workspace)
+        interactions = await Interaction.get()
+        scene = Scene(workspace, interactions=interactions)
         index = self.selected_index + 1
         self.scenes.insert(index, scene)
         # self.update_scenes()
@@ -436,9 +438,12 @@ class SceneViewer:
         scene = self.scenes[index]
         self.ignore_changes += 1
         self.plugin.update_workspace(Workspace())
-        self.plugin.update_workspace(scene.workspace)
-
+        current_interactions = await Interaction.get()
+        if current_interactions:
+            Interaction.destroy_multiple(current_interactions)
+        # self.plugin.update_workspace(scene.workspace)
         complexes = await self.plugin.request_complex_list()
+        await Interaction.upload_multiple(scene.interactions)
         for complex in complexes:
             complex.register_complex_updated_callback(self.on_scene_changed)
             complex.register_selection_changed_callback(self.on_scene_changed)
