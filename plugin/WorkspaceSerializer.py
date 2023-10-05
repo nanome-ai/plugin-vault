@@ -1,6 +1,9 @@
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from typing import List
+
+from nanome.api.interactions import Interaction
 from nanome.api.structure import Workspace
 from nanome.api.structure.serializers import WorkspaceSerializer, AtomSerializer
 from nanome._internal.network.context import ContextSerialization, ContextDeserialization
@@ -21,6 +24,7 @@ class Scene:
     workspace: Workspace
     name: str = ""
     description: str = ""
+    interactions: List[Interaction] = field(default_factory=list)
 
 
 class VaultWorkspaceSerializer:
