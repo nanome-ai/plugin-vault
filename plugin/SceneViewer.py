@@ -6,7 +6,7 @@ from functools import partial
 from nanome import ui
 from nanome.api.interactions import Interaction
 from nanome.api.structure import Complex, Workspace
-from nanome.util import async_callback
+from nanome.util import async_callback, Logs
 from nanome.util.enums import NotificationTypes
 
 from . import WorkspaceSerializer
@@ -448,6 +448,9 @@ class SceneViewer:
         if scene.interactions:
             updated_interactions = self.update_interaction_lines(scene.interactions, scene.workspace.complexes, updated_complexes)
             await Interaction.upload_multiple(updated_interactions)
+            # Update scene with new interactions and complexes.
+            scene.interactions = updated_interactions
+            scene.workspace.complexes = updated_complexes
 
         for complex in updated_complexes:
             complex.register_complex_updated_callback(self.on_scene_changed)
@@ -526,7 +529,7 @@ class SceneViewer:
     @staticmethod
     def update_interaction_lines(interaction_list, original_complexes, updated_complexes):
         """Update atom indices in interactions to reflect the updated complexes.
-        
+
         This is a workaround for the fact that atom indices change every time a workspace
         is reloaded into the room.
         """
@@ -539,8 +542,12 @@ class SceneViewer:
         for og_atom, updated_atom in zip(og_atoms, updated_atoms):
             atom_index_map[og_atom.index] = updated_atom.index
         for interaction in interaction_list:
-            interaction.atom1_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom1_idx_arr))
-            interaction.atom2_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom2_idx_arr))
+            try:
+                interaction.atom1_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom1_idx_arr))
+                interaction.atom2_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom2_idx_arr))
+            except Exception:
+                Logs.errror("Updating interaction lines failed =(.")
+                return
             interaction.index = -1
             updated_interactions.append(interaction)
         return updated_interactions
