@@ -307,8 +307,8 @@ class SceneViewer:
             for c in self.clipboard:
                 workspace.add_complex(c)
 
-            self.plugin.update_workspace(Workspace())
-            self.plugin.update_workspace(workspace)
+            await self.plugin.update_workspace(Workspace())
+            await self.plugin.update_workspace(workspace)
             btn.tooltip.title = 'copy selection'
             btn.selected = False
             self.on_scene_changed()
@@ -437,12 +437,11 @@ class SceneViewer:
         # clear workspace first to fix a bug where structure color doesn't update
         scene = self.scenes[index]
         self.ignore_changes += 1
-        self.plugin.update_workspace(Workspace())
+        await self.plugin.update_workspace(Workspace())
         current_interactions = await Interaction.get()
         if current_interactions:
             Interaction.destroy_multiple(current_interactions)
-        self.plugin.update_workspace(scene.workspace)
-        await asyncio.sleep(1)
+        await self.plugin.update_workspace(scene.workspace)
         shallow_comps = await self.plugin.request_complex_list()
         updated_complexes = await self.plugin.request_complexes([cmp.index for cmp in shallow_comps])
         if scene.interactions:

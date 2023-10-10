@@ -104,9 +104,9 @@ class Vault(nanome.AsyncPluginInstance):
             try:
                 with open(file_path, 'rb') as f:
                     workspace = WorkspaceSerializer.workspace_from_data(f.read())
-                    self.update_workspace(workspace)
+                    await self.update_workspace(workspace)
                 msg = f'Workspace "{item_name}" loaded'
-            except:
+            except Exception:
                 out_queue.append(file_path)
 
         # scene viewer
