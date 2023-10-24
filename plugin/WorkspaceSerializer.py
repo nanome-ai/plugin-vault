@@ -52,7 +52,7 @@ class SceneSerializer:
         context.write_using_serializer(string_serializer, value.name)
         context.write_using_serializer(string_serializer, value.description)
         context.write_using_serializer(vault_workspace_serializer, value.workspace)
-        context.write_using_serializer(ArrayField(), value.interactions)
+        context.write_using_serializer(interaction_array_serializer, value.interactions)
 
     def deserialize(self, version, context):
         name = context.read_using_serializer(string_serializer)
