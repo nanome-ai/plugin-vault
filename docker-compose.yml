@@ -5,7 +5,6 @@ services:
       context: .
       dockerfile: docker/plugin.Dockerfile
     env_file:
-      - .env
       - .env.plugin
     volumes:
      - ./plugin:/app/plugin
@@ -22,7 +21,6 @@ services:
      - vault-volume:/root
      - .:/app/server
     env_file:
-      - .env
       - .env.server
 volumes:
   vault-volume:
