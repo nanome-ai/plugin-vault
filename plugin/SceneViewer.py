@@ -534,8 +534,8 @@ class SceneViewer:
         """
         updated_interactions = []
         atom_index_map = {}
-        og_atoms = itertools.chain(*[cmp.atoms for cmp in original_complexes])
-        updated_atoms = itertools.chain(*[cmp.atoms for cmp in updated_complexes])
+        og_atoms = itertools.chain.from_iterable(cmp.atoms for cmp in original_complexes)
+        updated_atoms = itertools.chain.from_iterable(cmp.atoms for cmp in updated_complexes)
         # We are making the assumption that the og complex and updated complex
         # are the same, so we can just zip the atoms together and they align.
         for og_atom, updated_atom in zip(og_atoms, updated_atoms):
