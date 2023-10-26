@@ -443,7 +443,9 @@ class SceneViewer:
             Interaction.destroy_multiple(current_interactions)
         await self.plugin.update_workspace(scene.workspace)
         shallow_comps = await self.plugin.request_complex_list()
-        updated_complexes = await self.plugin.request_complexes([cmp.index for cmp in shallow_comps])
+        updated_complexes = []
+        if shallow_comps:
+            updated_complexes = await self.plugin.request_complexes([cmp.index for cmp in shallow_comps])
         if scene.interactions:
             updated_interactions = self.update_interaction_lines(scene.interactions, scene.workspace.complexes, updated_complexes)
             await Interaction.upload_multiple(updated_interactions)
@@ -535,7 +537,8 @@ class SceneViewer:
         updated_interactions = []
         atom_index_map = {}
         og_atoms = itertools.chain.from_iterable(cmp.atoms for cmp in original_complexes)
-        updated_atoms = itertools.chain.from_iterable(cmp.atoms for cmp in updated_complexes)
+        updated_atoms = itertools.chain.from_iterable(
+            cmp.atoms for cmp in updated_complexes if cmp is not None)
         # We are making the assumption that the og complex and updated complex
         # are the same, so we can just zip the atoms together and they align.
         for og_atom, updated_atom in zip(og_atoms, updated_atoms):
