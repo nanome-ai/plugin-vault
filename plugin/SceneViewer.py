@@ -545,7 +545,7 @@ class SceneViewer:
                 interaction.atom1_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom1_idx_arr))
                 interaction.atom2_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom2_idx_arr))
             except Exception:
-                Logs.errror("Updating interaction lines failed =(.")
+                Logs.error("Updating interaction lines failed =(.")
                 return
             interaction.index = -1
             updated_interactions.append(interaction)
