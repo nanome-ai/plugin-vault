@@ -20,7 +20,7 @@ atom_dictionary_serializer = DictionaryField()
 atom_dictionary_serializer.set_types(LongField(), AtomSerializer())
 
 interaction_array_serializer = ArrayField()
-interaction_array_serializer.set_type(InteractionSerializer)
+interaction_array_serializer.set_type(InteractionSerializer())
 
 
 @dataclass
