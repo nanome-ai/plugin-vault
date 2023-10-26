@@ -13,8 +13,7 @@ services:
       context: .
       dockerfile: docker/server.Dockerfile
     ports:
-      - 80:80
-      - 443:443
+      - 8000:8000
       # Uncomment if custom VAULT_WEB_PORT needs to be used.
       # - $VAULT_WEB_PORT:$VAULT_WEB_PORT
     volumes:
