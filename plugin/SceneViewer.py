@@ -431,6 +431,7 @@ class SceneViewer:
             index = len(self.scenes) + index
 
         self.selected_index = index
+        Logs.message(f"Loading Scene {index}")
         self.update_scenes()
         self.update_scene_info()
 
@@ -549,7 +550,7 @@ class SceneViewer:
                 interaction.atom2_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom2_idx_arr))
             except Exception:
                 Logs.error("Updating interaction lines failed =(.")
-                return
+                break
             interaction.index = -1
             updated_interactions.append(interaction)
         return updated_interactions
