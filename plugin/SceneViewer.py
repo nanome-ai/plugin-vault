@@ -501,7 +501,9 @@ class SceneViewer:
     @async_callback
     async def update_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
+        interactions = await Interaction.get()
         self.scenes[self.selected_index].workspace = workspace
+        self.scenes[self.selected_index].interactions = interactions
         self.plugin.update_content(btn)
         self.set_saved(False)
         self.scene_changes = False
