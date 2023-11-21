@@ -30,6 +30,7 @@ class Scene:
     description: str = ""
     interactions: List[Interaction] = field(default_factory=list)
 
+
 @dataclass
 class SceneOld:
     workspace: Workspace
@@ -69,6 +70,7 @@ class SceneSerializerOld:
         description = context.read_using_serializer(string_serializer)
         workspace = context.read_using_serializer(vault_workspace_serializer)
         return SceneOld(workspace, name, description)
+
 
 class SceneSerializer:
     def serialize(self, version, value, context):
@@ -128,7 +130,7 @@ def scenes_to_data(scenes):
 
 def scenes_from_data(data):
     try:
-        scene_list =  _read_using_serializer(scene_list_serializer, data)
+        scene_list = _read_using_serializer(scene_list_serializer, data)
     except UnicodeDecodeError:
         # Use old serializer
         scene_list = _read_using_serializer(scene_list_serializer_old, data)
