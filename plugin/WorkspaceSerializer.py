@@ -31,17 +31,6 @@ class Scene:
     interactions: List[Interaction] = field(default_factory=list)
 
 
-@dataclass
-class SceneOld:
-    workspace: Workspace
-    name: str = ""
-    description: str = ""
-
-    @property
-    def interactions(self):
-        return []
-
-
 class VaultWorkspaceSerializer:
     def serialize(self, version, value, context):
         subcontext = context.create_sub_context()
@@ -58,42 +47,34 @@ class VaultWorkspaceSerializer:
 vault_workspace_serializer = VaultWorkspaceSerializer()
 
 
-class SceneSerializerOld:
+class SceneSerializer(TypeSerializer):
+
+    def name(self):
+        return "SceneSerializer"
+
+    def version(self):
+        return 1
 
     def serialize(self, version, value, context):
         context.write_using_serializer(string_serializer, value.name)
         context.write_using_serializer(string_serializer, value.description)
         context.write_using_serializer(vault_workspace_serializer, value.workspace)
+        if version >= 1:
+            context.write_using_serializer(interaction_array_serializer, value.interactions)
 
     def deserialize(self, version, context):
         name = context.read_using_serializer(string_serializer)
         description = context.read_using_serializer(string_serializer)
         workspace = context.read_using_serializer(vault_workspace_serializer)
-        return SceneOld(workspace, name, description)
-
-
-class SceneSerializer:
-    def serialize(self, version, value, context):
-        context.write_using_serializer(string_serializer, value.name)
-        context.write_using_serializer(string_serializer, value.description)
-        context.write_using_serializer(vault_workspace_serializer, value.workspace)
-        context.write_using_serializer(interaction_array_serializer, value.interactions)
-
-    def deserialize(self, version, context):
-        name = context.read_using_serializer(string_serializer)
-        description = context.read_using_serializer(string_serializer)
-        workspace = context.read_using_serializer(vault_workspace_serializer)
-        interactions = context.read_using_serializer(interaction_array_serializer)
+        interactions = []
+        if version >= 1:
+            interactions = context.read_using_serializer(interaction_array_serializer)
         return Scene(workspace, name, description, interactions)
 
 
 scene_serializer = SceneSerializer()
 scene_list_serializer = ArrayField()
 scene_list_serializer.set_type(scene_serializer)
-
-scene_serializer_old = SceneSerializerOld()
-scene_list_serializer_old = ArrayField()
-scene_list_serializer_old.set_type(scene_serializer_old)
 
 
 def _write_using_serializer(serializer, data):
@@ -129,9 +110,4 @@ def scenes_to_data(scenes):
 
 
 def scenes_from_data(data):
-    try:
-        scene_list = _read_using_serializer(scene_list_serializer, data)
-    except UnicodeDecodeError:
-        # Use old serializer
-        scene_list = _read_using_serializer(scene_list_serializer_old, data)
-    return scene_list
+    return _read_using_serializer(scene_list_serializer, data)
