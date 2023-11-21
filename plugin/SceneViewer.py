@@ -1,11 +1,12 @@
 import asyncio
+import itertools
+import nanome
 import os
 from functools import partial
-
-import nanome
 from nanome import ui
+from nanome.api.interactions import Interaction
 from nanome.api.structure import Complex, Workspace
-from nanome.util import async_callback
+from nanome.util import async_callback, Logs
 from nanome.util.enums import NotificationTypes
 
 from . import WorkspaceSerializer
@@ -278,7 +279,8 @@ class SceneViewer:
     @async_callback
     async def add_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
-        scene = Scene(workspace)
+        interactions = await Interaction.get()
+        scene = Scene(workspace, interactions=interactions)
         index = self.selected_index + 1
         self.scenes.insert(index, scene)
         # self.update_scenes()
@@ -305,8 +307,8 @@ class SceneViewer:
             for c in self.clipboard:
                 workspace.add_complex(c)
 
-            self.plugin.update_workspace(Workspace())
-            self.plugin.update_workspace(workspace)
+            await self.plugin.update_workspace(Workspace())
+            await self.plugin.update_workspace(workspace)
             btn.tooltip.title = 'copy selection'
             btn.selected = False
             self.on_scene_changed()
@@ -429,17 +431,30 @@ class SceneViewer:
             index = len(self.scenes) + index
 
         self.selected_index = index
+        Logs.message(f"Loading Scene {index}")
         self.update_scenes()
         self.update_scene_info()
 
         # clear workspace first to fix a bug where structure color doesn't update
         scene = self.scenes[index]
         self.ignore_changes += 1
-        self.plugin.update_workspace(Workspace())
-        self.plugin.update_workspace(scene.workspace)
+        await self.plugin.update_workspace(Workspace())
+        current_interactions = await Interaction.get()
+        if current_interactions:
+            Interaction.destroy_multiple(current_interactions)
+        await self.plugin.update_workspace(scene.workspace)
+        shallow_comps = await self.plugin.request_complex_list()
+        updated_complexes = []
+        if shallow_comps:
+            updated_complexes = await self.plugin.request_complexes([cmp.index for cmp in shallow_comps])
+        if scene.interactions:
+            updated_interactions = self.update_interaction_lines(scene.interactions, scene.workspace.complexes, updated_complexes)
+            await Interaction.upload_multiple(updated_interactions)
+            # Update scene with new interactions and complexes.
+            scene.interactions = updated_interactions
+            scene.workspace.complexes = updated_complexes
 
-        complexes = await self.plugin.request_complex_list()
-        for complex in complexes:
+        for complex in updated_complexes:
             complex.register_complex_updated_callback(self.on_scene_changed)
             complex.register_selection_changed_callback(self.on_scene_changed)
 
@@ -486,7 +501,9 @@ class SceneViewer:
     @async_callback
     async def update_scene(self, btn=None):
         workspace = await self.plugin.request_workspace()
+        interactions = await Interaction.get()
         self.scenes[self.selected_index].workspace = workspace
+        self.scenes[self.selected_index].interactions = interactions
         self.plugin.update_content(btn)
         self.set_saved(False)
         self.scene_changes = False
@@ -512,3 +529,30 @@ class SceneViewer:
         self.plugin.update_content(self.inp_scene_name, self.inp_scene_desc)
         self.plugin.update_content(self.lbl_scene_name, self.lbl_scene_desc)
         self.update_scene_desc_len()
+
+    @staticmethod
+    def update_interaction_lines(interaction_list, original_complexes, updated_complexes):
+        """Update atom indices in interactions to reflect the updated complexes.
+
+        This is a workaround for the fact that atom indices change every time a workspace
+        is reloaded into the room.
+        """
+        updated_interactions = []
+        atom_index_map = {}
+        og_atoms = itertools.chain.from_iterable(cmp.atoms for cmp in original_complexes)
+        updated_atoms = itertools.chain.from_iterable(
+            cmp.atoms for cmp in updated_complexes if cmp is not None)
+        # We are making the assumption that the og complex and updated complex
+        # are the same, so we can just zip the atoms together and they align.
+        for og_atom, updated_atom in zip(og_atoms, updated_atoms):
+            atom_index_map[og_atom.index] = updated_atom.index
+        for interaction in interaction_list:
+            try:
+                interaction.atom1_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom1_idx_arr))
+                interaction.atom2_idx_arr = tuple(map(lambda x: atom_index_map[x], interaction.atom2_idx_arr))
+            except Exception:
+                Logs.error("Updating interaction lines failed =(.")
+                break
+            interaction.index = -1
+            updated_interactions.append(interaction)
+        return updated_interactions

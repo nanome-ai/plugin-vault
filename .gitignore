@@ -1,10 +1,12 @@
 __pycache__
 node_modules
 dist
-/.vscode
-/docker/.cachebust
-/docker/API_KEY
-/docker/redeploy.sh
+.vscode
+docker
+!docker/build.sh
+!docker/deploy.sh
+!docker/plugin.Dockerfile
+!docker/server.Dockerfile
 *.log
 .env*
 !.env.sample

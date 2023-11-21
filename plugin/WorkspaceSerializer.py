@@ -1,6 +1,10 @@
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from typing import List
+
+from nanome.api.interactions import Interaction
+from nanome.api.interactions.serializers import InteractionSerializer
 from nanome.api.structure import Workspace
 from nanome.api.structure.serializers import WorkspaceSerializer, AtomSerializer
 from nanome._internal.network.context import ContextSerialization, ContextDeserialization
@@ -15,12 +19,16 @@ dictionary_serializer.set_types(StringField(), ByteField())
 atom_dictionary_serializer = DictionaryField()
 atom_dictionary_serializer.set_types(LongField(), AtomSerializer())
 
+interaction_array_serializer = ArrayField()
+interaction_array_serializer.set_type(InteractionSerializer())
+
 
 @dataclass
 class Scene:
     workspace: Workspace
     name: str = ""
     description: str = ""
+    interactions: List[Interaction] = field(default_factory=list)
 
 
 class VaultWorkspaceSerializer:
@@ -39,17 +47,29 @@ class VaultWorkspaceSerializer:
 vault_workspace_serializer = VaultWorkspaceSerializer()
 
 
-class SceneSerializer:
+class SceneSerializer(TypeSerializer):
+
+    def name(self):
+        return "SceneSerializer"
+
+    def version(self):
+        return 1
+
     def serialize(self, version, value, context):
         context.write_using_serializer(string_serializer, value.name)
         context.write_using_serializer(string_serializer, value.description)
         context.write_using_serializer(vault_workspace_serializer, value.workspace)
+        if version >= 1:
+            context.write_using_serializer(interaction_array_serializer, value.interactions)
 
     def deserialize(self, version, context):
         name = context.read_using_serializer(string_serializer)
         description = context.read_using_serializer(string_serializer)
         workspace = context.read_using_serializer(vault_workspace_serializer)
-        return Scene(workspace, name, description)
+        interactions = []
+        if version >= 1:
+            interactions = context.read_using_serializer(interaction_array_serializer)
+        return Scene(workspace, name, description, interactions)
 
 
 scene_serializer = SceneSerializer()
