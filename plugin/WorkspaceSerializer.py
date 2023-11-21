@@ -58,7 +58,7 @@ class SceneSerializer:
         name = context.read_using_serializer(string_serializer)
         description = context.read_using_serializer(string_serializer)
         workspace = context.read_using_serializer(vault_workspace_serializer)
-        interactions = context.read_using_serializer(interaction_array_serializer) 
+        interactions = context.read_using_serializer(interaction_array_serializer)
         return Scene(workspace, name, description, interactions)
 
 
