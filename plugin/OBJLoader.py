@@ -15,12 +15,14 @@ from nanome.util.enums import ShapeAnchorType
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 MENU_PATH = os.path.join(BASE_DIR, 'menus', 'json', 'obj_menu.json')
 
+
 def flatten(iterable):
     for item in iterable:
         try:
             yield from flatten(item)
         except TypeError:
             yield item
+
 
 @dataclass
 class OBJ:
@@ -31,6 +33,7 @@ class OBJ:
     min_bounds: Vector3
     max_bounds: Vector3
     scale: float = 1.0
+
 
 class OBJLoader:
     def __init__(self, plugin: nanome.PluginInstance):
@@ -129,6 +132,7 @@ class OBJLoader:
             lines = f.readlines()
 
         num_vertices = len(list(filter(lambda l: l.startswith('v '), lines)))
+
         def vertex_index(i):
             if isinstance(i, str):
                 if i == '':
