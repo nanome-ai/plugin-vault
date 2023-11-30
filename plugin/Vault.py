@@ -43,7 +43,6 @@ class Vault(nanome.AsyncPluginInstance):
 
     def on_run(self):
         self.on_presenter_change()
-        self.menu.open_folder('.')
         self.menu.show_menu()
 
     @async_callback
@@ -60,12 +59,14 @@ class Vault(nanome.AsyncPluginInstance):
 
     @async_callback
     async def on_presenter_change(self):
+        in_account = self.account in self.menu.path
+        in_org = self.org and self.org in self.menu.path
+        if in_account or in_org:
+            self.menu.path = '.'
+
         info = await self.request_presenter_info()
         if not info.account_id:
             return
-
-        in_account = self.account in self.menu.path
-        in_org = self.org and self.org in self.menu.path
 
         self.account = info.account_id
         self.vault.create_path(self.account)
@@ -79,11 +80,7 @@ class Vault(nanome.AsyncPluginInstance):
         if not self.menu.menu.enabled:
             return
 
-        if in_account or in_org:
-            self.menu.path = '.'
-            self.menu.open_folder('.')
-        else:
-            self.menu.update()
+        self.menu.open_folder('.')
 
     def on_complex_list_changed(self):
         self.scene_viewer.on_scene_changed()
