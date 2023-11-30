@@ -193,7 +193,7 @@ class VaultMenu:
         else:
             self.lbl_instr.text_value = f'Visit {self.address} in browser to add files'
 
-        self.update()
+        self.open_folder('.')
         self.menu.enabled = True
         self.plugin.update_menu(self.menu)
 
