@@ -23,6 +23,16 @@ RUN mkdir -p $DOCS_FOLDER && \
     chgrp -R 0 $DOCS_FOLDER && \
     chmod -R g=u $DOCS_FOLDER
 
+ENV YARN_FOLDER=/.yarn
+RUN mkdir -p $YARN_FOLDER && \
+    chgrp -R 0 $YARN_FOLDER && \
+    chmod -R g=u $YARN_FOLDER
+
+ENV CACHE_FOLDER=/.cache
+RUN mkdir -p $CACHE_FOLDER && \
+    chgrp -R 0 $CACHE_FOLDER && \
+    chmod -R g=u $CACHE_FOLDER
+
 EXPOSE $HTTP_PORT $HTTPS_PORT
 
 CMD yarn start $ARGS
