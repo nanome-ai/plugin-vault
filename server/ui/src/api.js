@@ -1,5 +1,5 @@
 import store from '@/store'
-const LOGIN_API = 'https://api.nanome.ai/user'
+const AUTH_API = 'https://api.nanome.ai'
 
 function replacePath(path) {
   return path
@@ -13,7 +13,7 @@ function addSlash(path) {
 }
 
 async function request(url, options = {}) {
-  if (store.state.token && !url.startsWith(LOGIN_API)) {
+  if (store.state.token && !url.startsWith(AUTH_API)) {
     options.headers = Object.assign({}, options.headers, {
       Authorization: 'Bearer ' + store.state.token
     })
@@ -82,10 +82,23 @@ const API = {
       source: 'web:plugin-vault'
     }
 
-    return request(`${LOGIN_API}/login`, {
+    return request(`${AUTH_API}/user/login`, {
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
       body: JSON.stringify(body)
+    })
+  },
+
+  loginSSO(email, redirect) {
+    const params = new URLSearchParams({
+      email,
+      redirect,
+      cookie: false
+    })
+
+    return request(`${AUTH_API}/sso/login?` + params, {
+      headers: { 'Content-Type': 'application/json' },
+      method: 'GET'
     })
   },
 
@@ -93,7 +106,7 @@ const API = {
     const token = store.state.token
     if (!token) return {}
 
-    return request(`${LOGIN_API}/session`, {
+    return request(`${AUTH_API}/user/session`, {
       headers: { Authorization: `Bearer ${token}` }
     })
   },

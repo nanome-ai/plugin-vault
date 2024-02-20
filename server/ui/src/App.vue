@@ -6,10 +6,23 @@
 </template>
 
 <script>
+import { mapState } from 'vuex'
 import UploadManager from '@/components/UploadManager'
 
 export default {
-  components: { UploadManager }
+  components: { UploadManager },
+
+  computed: mapState(['unique']),
+
+  created() {
+    const { query, path } = this.$route
+    if (!this.unique && query.auth) {
+      const data = { token: query.auth }
+      this.$store.commit('PATCH_USER', data)
+      this.$store.dispatch('refresh')
+      this.$router.replace({ path })
+    }
+  }
 }
 </script>
 

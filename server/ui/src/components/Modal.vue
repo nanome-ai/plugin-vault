@@ -29,15 +29,60 @@
               type="password"
             />
 
-            <p v-if="error" class="text-red-500">incorrect login or password</p>
+            <p v-if="error" class="text-red-500">{{ error }}</p>
 
             <p>
               <a
+                key="login-forgot"
                 href="https://home.nanome.ai/login/forgot"
                 target="_blank"
                 class="link text-blue-500"
+                >forgot password?</a
               >
-                forgot password?
+              or
+
+              <a
+                key="login-sso"
+                class="link text-blue-500"
+                @click.stop="options.type = 'login-sso'"
+                >log in with SSO</a
+              >
+            </p>
+
+            <p></p>
+
+            <p class="text-xs text-gray-700">
+              Don't have a Nanome account?
+              <a
+                href="https://home.nanome.ai/register"
+                target="_blank"
+                class="link text-blue-500"
+              >
+                Register here
+              </a>
+            </p>
+          </template>
+
+          <template v-else-if="options.type === 'login-sso'">
+            <input
+              ref="login"
+              v-model="input1"
+              :class="{ 'border-red-500': error }"
+              placeholder="email"
+              type="text"
+            />
+
+            <p v-if="error" class="text-red-500">
+              {{ error }}
+            </p>
+
+            <p>
+              <a
+                key="login-username"
+                class="link text-blue-500"
+                @click.stop="options.type = 'login'"
+              >
+                log in with username
               </a>
             </p>
 
@@ -107,7 +152,7 @@ const deferred = () => {
 export default {
   data: () => ({
     showing: false,
-    error: false,
+    error: null,
     loading: false,
     options: { ...defaults },
     input1: '',
@@ -121,11 +166,19 @@ export default {
 
       if (this.options.type === 'login') {
         return !this.input1 || !this.input2
-      } else if (this.options.type === 'prompt') {
+      } else if (['login-sso', 'prompt'].includes(this.options.type)) {
         return !this.input1
       }
 
       return false
+    }
+  },
+
+  watch: {
+    'options.type'() {
+      this.error = null
+      this.input1 = ''
+      this.input2 = ''
     }
   },
 
@@ -229,6 +282,9 @@ export default {
       } else if (this.options.type === 'login') {
         this.attemptLogin()
         return
+      } else if (this.options.type === 'login-sso') {
+        this.attemptLoginSSO()
+        return
       }
 
       this.deferred.resolve(data)
@@ -237,7 +293,7 @@ export default {
 
     async attemptLogin() {
       const deferred = this.deferred
-      this.error = false
+      this.error = null
 
       const creds = {
         username: this.input1,
@@ -252,6 +308,9 @@ export default {
           break
         } catch (e) {
           this.loading = false
+          this.error = e.message
+          if (!this.error.includes('2FA')) break
+
           creds.tfa_code = await this.prompt({
             title: 'Enter 2FA code',
             body: 'Or use a one time recovery code',
@@ -269,8 +328,19 @@ export default {
       if (success) {
         deferred.resolve(true)
         this.reset()
-      } else {
-        this.error = true
+      }
+    },
+
+    async attemptLoginSSO() {
+      this.error = null
+      this.loading = true
+
+      try {
+        const url = await this.$store.dispatch('loginSSO', this.input1)
+        window.open(url, '_self')
+      } catch (e) {
+        this.loading = false
+        this.error = e.message
       }
     }
   }
