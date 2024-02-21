@@ -75,10 +75,18 @@ const actions = {
 
   async login({ commit }, creds) {
     const data = await API.login(creds)
-    if (data.code === 401) {
+    if (data.code !== 200) {
       throw new Error(data.error.message)
     }
     return saveSession(commit, data)
+  },
+
+  async loginSSO(_, email) {
+    const data = await API.loginSSO(email, window.location.href)
+    if (data.code !== 200) {
+      throw new Error(data.error.message)
+    }
+    return data.results
   },
 
   async refresh({ commit }) {
