@@ -175,7 +175,8 @@ export default {
   },
 
   watch: {
-    'options.type'() {
+    'options.type'(value) {
+      if (!value.includes('login')) return
       this.error = null
       this.input1 = ''
       this.input2 = ''
