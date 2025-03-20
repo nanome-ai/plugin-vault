@@ -59,7 +59,11 @@ while [ -n "$1" ]; do
             NGINX=1
             ;;
         -u | --url )
-            SERVER_ARGS+=(--env VIRTUAL_HOST=$2)
+            url_base=$2
+            if [[ $2 == *":"* ]]; then
+                url_base=${2%:*}
+            fi
+            SERVER_ARGS+=(--env VIRTUAL_HOST=$url_base)
             shift
             ;;
         -w | --web-port )
