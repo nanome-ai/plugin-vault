@@ -14,7 +14,8 @@ const state = {
   extensions: {
     supported: [],
     extras: [],
-    converted: []
+    converted: [],
+    external: []
   },
   message: null
 }
