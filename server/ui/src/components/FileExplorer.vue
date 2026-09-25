@@ -48,7 +48,7 @@
           <button @click="loadInNanome2(true)">
             <fa-icon icon="plus" transform="shrink-2" class="icon" />
             add {{ structurePaths.length | pluralize('file') }} to a Nanome 2
-            workspace…
+            workspace
           </button>
         </li>
         <li v-if="sessionPaths.length">
@@ -96,7 +96,7 @@
         <li v-if="structurePaths.length">
           <button @click="loadInNanome2(true)">
             <fa-icon icon="plus" transform="shrink-2" class="icon" />
-            add to a Nanome 2 workspace…
+            add to a Nanome 2 workspace
           </button>
         </li>
         <li v-if="menuOptions.canEncrypt">
