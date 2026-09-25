@@ -1,5 +1,6 @@
 <template>
   <div class="home min-h-full container m-auto bg-white flex flex-col">
+    <nanome2-banner />
     <header class="mb-4 mx-auto text-white">
       <div class="inline-flex items-baseline text-5xl">
         <img class="mr-4" src="@/assets/logo.png" /> Vault
@@ -63,9 +64,10 @@
 <script>
 import { mapState } from 'vuex'
 import FileExplorer from '@/components/FileExplorer'
+import Nanome2Banner from '@/components/Nanome2Banner'
 
 export default {
-  components: { FileExplorer },
+  components: { FileExplorer, Nanome2Banner },
   data: () => ({ showMore: false }),
   computed: mapState(['authEnabled', 'token', 'name', 'extensions', 'message'])
 }
