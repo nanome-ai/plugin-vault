@@ -28,7 +28,11 @@ Using [Gotenberg](https://github.com/thecodingmachine/gotenberg), the following 
 
 - **Select** files and folders with a click, ctrl/cmd-click, shift-click, the checkboxes, or ctrl/cmd+A. Esc or a click on empty space clears the selection.
 - **Download** a file with a double-click or its right-click menu. A folder downloads as a zip from its right-click menu, and a selection of several items downloads as one zip from the toolbar or the right-click menu. Files in an encrypted folder are decrypted with its key. Encrypted folders inside a selection need their own key, so they are left out and named after the download starts.
-- **Open in Nanome 2** is in the right-click menu of `.nanome` and `.nanoscenes` files (v1 sessions). The page sends the session to the Nanome v1 Session Importer tool on the Nanome 2 web app (MARA), builds a new Nanome 2 workspace from the result, reads it back to check it, and links it in a card at the bottom left. It uses the Vault login, so it asks for one first. The import runs in the page, so the tab has to stay open until it finishes; a large session can take several minutes. The import code comes from [nanome-ai/open-in-nanome-2](https://github.com/nanome-ai/open-in-nanome-2) (`server/ui/src/nanome2/pipeline.js`, copied without its references to private source files), which also documents each step and its limits.
+- **Open in Nanome 2** is in the right-click menu of files Nanome 2 can use, for one file or a selection:
+  - Structure files (`.pdb` `.pqr` `.cif` `.mmcif` `.sdf` `.mol2` `.xyz`) load into a new Nanome 2 workspace, or into an existing one picked from a list of the user's workspaces (most recently opened first). Each file is loaded with its default representations, as the Nanome 2 web app does, into the workspace's first scene.
+  - v1 sessions (`.nanome` `.nanoscenes`) are converted with the Nanome v1 Session Importer tool on the Nanome 2 web app (MARA) into a new workspace each, which is read back and checked. The import code comes from [nanome-ai/open-in-nanome-2](https://github.com/nanome-ai/open-in-nanome-2) (`server/ui/src/nanome2/pipeline.js`, copied without its references to private source files), which also documents each step and its limits.
+
+  Both use the Vault login, so they ask for one first. Progress and a link to the workspace show in a card at the bottom left. The work runs in the page, so the tab has to stay open until it finishes; converting a large session can take several minutes. A banner at the top of the page points Classic users to Nanome 2 whenever this is enabled.
 
 ## Usage
 
@@ -52,7 +56,7 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 
 - `--disable-nanome2`
 
-  Hide Open in Nanome 2, for example when browsers using this Vault cannot reach the Nanome 2 web app.
+  Hide Open in Nanome 2 and the Nanome 2 banner, for example when browsers using this Vault cannot reach the Nanome 2 web app.
 
 - `--https`
 

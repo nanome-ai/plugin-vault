@@ -34,8 +34,25 @@
             download {{ contextmenu.selection.length }} items
           </button>
         </li>
+        <li v-if="structurePaths.length">
+          <button @click="loadInNanome2(false)">
+            <fa-icon
+              icon="external-link-alt"
+              transform="shrink-2"
+              class="icon"
+            />
+            open {{ structurePaths.length | pluralize('file') }} in Nanome 2
+          </button>
+        </li>
+        <li v-if="structurePaths.length">
+          <button @click="loadInNanome2(true)">
+            <fa-icon icon="plus" transform="shrink-2" class="icon" />
+            add {{ structurePaths.length | pluralize('file') }} to a Nanome 2
+            workspace…
+          </button>
+        </li>
         <li v-if="sessionPaths.length">
-          <button @click="openInNanome2">
+          <button @click="openSessions">
             <fa-icon
               icon="external-link-alt"
               transform="shrink-2"
@@ -64,14 +81,22 @@
             download as zip
           </button>
         </li>
-        <li v-if="sessionPaths.length">
-          <button @click="openInNanome2">
+        <li v-if="sessionPaths.length || structurePaths.length">
+          <button
+            @click="sessionPaths.length ? openSessions() : loadInNanome2(false)"
+          >
             <fa-icon
               icon="external-link-alt"
               transform="shrink-2"
               class="icon"
             />
             open in Nanome 2
+          </button>
+        </li>
+        <li v-if="structurePaths.length">
+          <button @click="loadInNanome2(true)">
+            <fa-icon icon="plus" transform="shrink-2" class="icon" />
+            add to a Nanome 2 workspace…
           </button>
         </li>
         <li v-if="menuOptions.canEncrypt">
@@ -120,7 +145,7 @@
 <script>
 import { mapState } from 'vuex'
 import API from '@/api'
-import { SESSION_FILE } from '@/nanome2'
+import { SESSION_FILE, STRUCTURE_FILE } from '@/nanome2'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import Toolbar from '@/components/Toolbar'
 import FileViewGrid from '@/components/FileViewGrid'
@@ -164,11 +189,20 @@ export default {
       return this.contextmenu.selection.length > 1
     },
 
+    // what the right-click acts on
+    menuPaths() {
+      const { path, selection } = this.contextmenu
+      return this.multiple ? selection : [path]
+    },
+
     sessionPaths() {
       if (!this.nanome2) return []
-      const { path, selection } = this.contextmenu
-      const paths = this.multiple ? selection : [path]
-      return paths.filter(p => SESSION_FILE.test(p))
+      return this.menuPaths.filter(p => SESSION_FILE.test(p))
+    },
+
+    structurePaths() {
+      if (!this.nanome2) return []
+      return this.menuPaths.filter(p => STRUCTURE_FILE.test(p))
     },
 
     menuOptions() {
@@ -423,8 +457,12 @@ export default {
       }
     },
 
-    openInNanome2() {
+    openSessions() {
       this.$root.$emit('open-in-nanome2', this.sessionPaths)
+    },
+
+    loadInNanome2(pick) {
+      this.$root.$emit('load-in-nanome2', { paths: this.structurePaths, pick })
     },
 
     clearOnBlank(event) {
