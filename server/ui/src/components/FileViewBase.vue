@@ -1,8 +1,12 @@
 <script>
 import API from '@/api'
 import debounce from '@/helpers/debounce'
+import { nextSelection } from '@/helpers/selection'
+import SelectBox from '@/components/SelectBox'
 
 export default {
+  components: { SelectBox },
+
   props: {
     path: String
   },
@@ -14,6 +18,23 @@ export default {
     folders: [],
     files: []
   }),
+
+  computed: {
+    // the root holds only shared, my org and account
+    selectable() {
+      return this.path !== '/'
+    },
+
+    order() {
+      const folders = this.folders.map(f => f.name + '/')
+      return folders.concat(this.files.map(f => f.full))
+    },
+
+    selected() {
+      const { folder, items } = this.$store.state.selection
+      return folder === this.path ? items : []
+    }
+  },
 
   watch: {
     path: {
@@ -35,6 +56,7 @@ export default {
     async refresh(newPath) {
       if (this.beforeRefresh && newPath) this.beforeRefresh()
       this.loading = true
+      if (!this.nested) this.$store.commit('SET_FOLDER_ITEMS', [])
 
       const needsAuth = /^\/(account|my-org)\//.test(this.path)
       if (needsAuth && !this.$store.state.unique) {
@@ -48,6 +70,7 @@ export default {
         this.folders = data.folders
         this.files = data.files
         this.loading = false
+        this.syncSelection()
       } catch (e) {
         if (e.code === 401) {
           this.$store.commit('AUTH_ENABLED')
@@ -65,6 +88,14 @@ export default {
 
     contextmenu(event, item, encrypted = false) {
       event.stopPropagation()
+
+      // like a file manager: right-clicking outside the selection selects the
+      // item, right-clicking inside it acts on all of it
+      const selectable = this.selectable && this.order.includes(item)
+      if (selectable && !this.isSelected(item)) {
+        this.setSelection({ items: [item], anchor: item })
+      }
+
       this.$root.$emit('contextmenu', {
         event,
         path: this.path + item,
@@ -72,8 +103,54 @@ export default {
         folders: this.folders.filter(f => !this.encrypted.includes(f.name)),
         encrypted,
         key_path: this.key_path,
+        selection: selectable ? this.selected.map(i => this.path + i) : [],
         component: this
       })
+    },
+
+    isSelected(item) {
+      return this.selected.includes(item)
+    },
+
+    setSelection({ items, anchor }) {
+      this.$store.commit('SELECT', { folder: this.path, items, anchor })
+    },
+
+    select(event, item) {
+      if (!this.selectable) return
+
+      const toggle = event.metaKey || event.ctrlKey
+      const range = event.shiftKey
+      // stop cmd/shift-click on a folder link opening a tab or window
+      if (toggle || range) event.preventDefault()
+
+      const { folder, items, anchor } = this.$store.state.selection
+      const current = folder === this.path ? { items, anchor } : {}
+      const next = nextSelection(
+        { items: [], anchor: null, ...current },
+        this.order,
+        item,
+        { toggle, range }
+      )
+      this.setSelection(next)
+    },
+
+    toggleSelect(item) {
+      this.select({ metaKey: true, preventDefault() {} }, item)
+    },
+
+    // after a refresh: offer the items for select all, forget removed ones
+    syncSelection() {
+      if (!this.nested) {
+        const items = this.selectable ? this.order : []
+        this.$store.commit('SET_FOLDER_ITEMS', items)
+      }
+
+      const { anchor } = this.$store.state.selection
+      const kept = this.selected.filter(i => this.order.includes(i))
+      if (kept.length !== this.selected.length) {
+        this.setSelection({ items: kept, anchor })
+      }
     },
 
     isLocked(folder) {

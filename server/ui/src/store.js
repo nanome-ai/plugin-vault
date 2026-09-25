@@ -17,7 +17,13 @@ const state = {
     converted: [],
     external: []
   },
-  message: null
+  message: null,
+  // { url, toolId } of the Nanome 2 web app, or null when turned off
+  nanome2: null,
+  // selected items (names in folder, folders end in '/'), one folder at a time
+  selection: { folder: null, items: [], anchor: null },
+  // names of the items in the folder being viewed, for select all
+  folderItems: []
 }
 
 const getters = {
@@ -39,6 +45,22 @@ const mutations = {
 
   SET_MESSAGE(state, message) {
     state.message = message
+  },
+
+  SET_NANOME2(state, nanome2) {
+    state.nanome2 = nanome2 || null
+  },
+
+  SELECT(state, { folder, items, anchor = null }) {
+    state.selection = { folder, items, anchor }
+  },
+
+  CLEAR_SELECTION(state) {
+    state.selection = { folder: null, items: [], anchor: null }
+  },
+
+  SET_FOLDER_ITEMS(state, items) {
+    state.folderItems = items
   }
 }
 
@@ -69,9 +91,10 @@ async function saveSession(commit, { success, results }) {
 
 const actions = {
   async getInfo({ commit }) {
-    const { extensions, message } = await API.getInfo()
+    const { extensions, message, nanome2 } = await API.getInfo()
     commit('SET_EXTENSIONS', extensions)
     commit('SET_MESSAGE', message)
+    commit('SET_NANOME2', nanome2)
   },
 
   async login({ commit }, creds) {

@@ -2,7 +2,12 @@
   <div v-if="!loading" class="file-view-list text-lg">
     <ul v-if="files.length || folders.length" class="w-full">
       <template v-for="folder in folders">
-        <li :key="folder.name" class="p-2 flex items-center">
+        <li
+          :key="folder.name"
+          :class="{ selected: isSelected(folder.name + '/') }"
+          class="p-2 flex items-center"
+          data-select
+        >
           <fa-icon
             icon="angle-right"
             class="text-2xl w-8 cursor-pointer text-gray-500 hover:text-black"
@@ -10,10 +15,18 @@
             @click="toggleFolder(folder.name, isLocked(folder.name))"
             :class="{ expanded: expanded[folder.name] }"
           />
+          <select-box
+            v-if="selectable"
+            class="mr-3"
+            :checked="isSelected(folder.name + '/')"
+            :label="folder.name"
+            @toggle="toggleSelect(folder.name + '/')"
+          />
           <a
             v-if="encrypted.includes(folder.name)"
             :title="`${folder.name} (${folder.size_text})`"
             class="file cursor-default"
+            @click="select($event, folder.name + '/')"
             @dblclick="openLocked(folder.name)"
             @contextmenu.prevent="contextmenu($event, folder.name + '/', true)"
           >
@@ -33,6 +46,7 @@
             :to="`${path}${folder.name}/`"
             class="file cursor-default"
             event="dblclick"
+            @click.native="select($event, folder.name + '/')"
             @contextmenu.native.prevent="contextmenu($event, folder.name + '/')"
           >
             <fa-icon icon="folder" class="icon mr-2" />
@@ -130,11 +144,21 @@
         v-for="file in files"
         :key="file.full"
         :title="`${file.full} (${file.size_text})`"
+        :class="{ selected: isSelected(file.full) }"
         class="p-2 file"
+        data-select
+        @click="select($event, file.full)"
         @contextmenu.prevent="contextmenu($event, file.full)"
         @dblclick="$root.$emit('download', path + file.full)"
       >
-        <div class="w-8"></div>
+        <div class="w-8 flex-shrink-0"></div>
+        <select-box
+          v-if="selectable"
+          class="mr-3"
+          :checked="isSelected(file.full)"
+          :label="file.full"
+          @toggle="toggleSelect(file.full)"
+        />
         <fa-layers class="icon mr-2">
           <fa-icon icon="file" />
           <fa-text
@@ -223,6 +247,14 @@ export default {
 
   li:not(:last-child) {
     @apply border-b;
+  }
+
+  li.selected {
+    background-color: rgba(46, 112, 191, 0.15);
+  }
+
+  .select-box {
+    @apply flex-shrink-0;
   }
 
   .icon {

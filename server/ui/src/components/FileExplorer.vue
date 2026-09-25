@@ -5,11 +5,13 @@
         @display-mode="displayMode = $event"
         @new-folder="newFolder"
         @show-upload="showDropzone"
+        @download-selection="downloadSelection"
       />
       <breadcrumbs :path="path" />
     </div>
     <div
       class="flex-grow relative select-none px-4"
+      @click="clearOnBlank"
       @contextmenu.prevent="showContextMenu({ event: $event, path })"
     >
       <file-view-grid v-if="displayMode === 'grid'" :path="path" />
@@ -25,7 +27,25 @@
       ref="contextmenu"
       :style="{ top: contextmenu.top, left: contextmenu.left }"
     >
-      <ul>
+      <ul v-if="multiple">
+        <li>
+          <button @click="downloadSelection">
+            <fa-icon icon="file-archive" transform="shrink-2" class="icon" />
+            download {{ contextmenu.selection.length }} items
+          </button>
+        </li>
+        <li v-if="sessionPaths.length">
+          <button @click="openInNanome2">
+            <fa-icon
+              icon="external-link-alt"
+              transform="shrink-2"
+              class="icon"
+            />
+            open {{ sessionPaths.length | pluralize('session') }} in Nanome 2
+          </button>
+        </li>
+      </ul>
+      <ul v-else>
         <li v-if="menuOptions.canCreate">
           <button @click="newFolder(contextmenu.path)">
             <fa-icon icon="folder-plus" transform="shrink-2" class="icon" />
@@ -36,6 +56,22 @@
           <button @click="downloadItem">
             <fa-icon icon="file-download" transform="shrink-2" class="icon" />
             download
+          </button>
+        </li>
+        <li v-else-if="menuOptions.canZip">
+          <button @click="downloadFolder(contextmenu.path)">
+            <fa-icon icon="file-archive" transform="shrink-2" class="icon" />
+            download as zip
+          </button>
+        </li>
+        <li v-if="sessionPaths.length">
+          <button @click="openInNanome2">
+            <fa-icon
+              icon="external-link-alt"
+              transform="shrink-2"
+              class="icon"
+            />
+            open in Nanome 2
           </button>
         </li>
         <li v-if="menuOptions.canEncrypt">
@@ -82,7 +118,9 @@
 </template>
 
 <script>
+import { mapState } from 'vuex'
 import API from '@/api'
+import { SESSION_FILE } from '@/nanome2'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import Toolbar from '@/components/Toolbar'
 import FileViewGrid from '@/components/FileViewGrid'
@@ -107,6 +145,7 @@ export default {
       folders: [],
       encrypted: false,
       key_path: null,
+      selection: [],
       top: 0,
       left: 0
     },
@@ -114,8 +153,22 @@ export default {
   }),
 
   computed: {
+    ...mapState(['nanome2']),
+
     path() {
       return this.$route.path
+    },
+
+    // right-clicked inside a selection of several items
+    multiple() {
+      return this.contextmenu.selection.length > 1
+    },
+
+    sessionPaths() {
+      if (!this.nanome2) return []
+      const { path, selection } = this.contextmenu
+      const paths = this.multiple ? selection : [path]
+      return paths.filter(p => SESSION_FILE.test(p))
     },
 
     menuOptions() {
@@ -129,11 +182,15 @@ export default {
       const canEncrypt =
         !encrypted && !key_path && isFolder && canModify && !inAccount
 
+      // zipping the whole shared folder would take in everyone's files
+      const canZip = isFolder && !['/', '/shared/'].includes(path)
+
       return {
         isFolder,
         canCreate,
         canModify,
-        canEncrypt
+        canEncrypt,
+        canZip
       }
     },
 
@@ -163,6 +220,12 @@ export default {
     }
   },
 
+  watch: {
+    path() {
+      this.$store.commit('CLEAR_SELECTION')
+    }
+  },
+
   mounted() {
     const hideContextOnScroll = () => {
       if (this.contextmenu.show) {
@@ -171,11 +234,14 @@ export default {
     }
 
     window.addEventListener('scroll', hideContextOnScroll, { passive: true })
+    // capture: see Escape before the open context menu closes itself on it
+    window.addEventListener('keydown', this.onKeydown, true)
     this.$root.$on('contextmenu', this.showContextMenu)
     this.$root.$on('download', API.download)
 
     this.$once('hook:beforeDestroy', () => {
       window.removeEventListener('scroll', hideContextOnScroll)
+      window.removeEventListener('keydown', this.onKeydown, true)
       this.$root.$off('contextmenu', this.showContextMenu)
       this.$root.$off('download', API.download)
     })
@@ -294,6 +360,97 @@ export default {
       API.download(this.contextmenu.path)
     },
 
+    downloadSelection() {
+      const { folder, items } = this.$store.state.selection
+      if (!items.length) return
+      if (items.length > 1) return this.zip(folder, items)
+
+      const path = folder + items[0]
+      if (path.slice(-1) === '/') this.downloadFolder(path)
+      else API.download(path)
+    },
+
+    async downloadFolder(path) {
+      // the route stays URL-encoded when a folder's address is opened directly
+      let name = path
+        .slice(0, -1)
+        .split('/')
+        .pop()
+      try {
+        name = decodeURIComponent(name)
+      } catch (e) {}
+      try {
+        let res = await API.zip(path, [], name)
+        if (res.code === 403) {
+          const key = await this.verifyKey(path, 'Download')
+          if (!key) return
+          res = await API.zip(path, [], name)
+        }
+        this.saveZip(res)
+      } catch (e) {
+        this.saveZip({ error: e })
+      }
+    },
+
+    async zip(folder, items) {
+      try {
+        this.saveZip(await API.zip(folder, items))
+      } catch (e) {
+        this.saveZip({ error: e })
+      }
+    },
+
+    saveZip(res) {
+      if (!res.success) {
+        const message = (res.error && res.error.message) || 'Please try again'
+        this.$modal.alert({
+          title: 'Download Failed',
+          body: escapeHtml(message)
+        })
+        return
+      }
+
+      API.downloadZip(res)
+      if (res.skipped.length) {
+        const names = res.skipped.map(escapeHtml).join('<br>')
+        this.$modal.alert({
+          title: 'Encrypted Folders Left Out',
+          body:
+            'Encrypted folders need their own key, so these are not in the zip:' +
+            `<br><b>${names}</b><br><br>` +
+            'Each can be downloaded on its own from its right-click menu.'
+        })
+      }
+    },
+
+    openInNanome2() {
+      this.$root.$emit('open-in-nanome2', this.sessionPaths)
+    },
+
+    clearOnBlank(event) {
+      if (!event.target.closest('[data-select]')) {
+        this.$store.commit('CLEAR_SELECTION')
+      }
+    },
+
+    onKeydown(e) {
+      if (this.$modal.showing) return
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)
+      if (typing && e.target.type !== 'checkbox') return
+
+      const { folderItems } = this.$store.state
+      const selectAll = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a'
+      if (selectAll && folderItems.length) {
+        e.preventDefault()
+        this.$store.commit('SELECT', {
+          folder: this.path,
+          items: folderItems.slice()
+        })
+      } else if (e.key === 'Escape' && !this.contextmenu.show) {
+        this.$store.commit('CLEAR_SELECTION')
+      }
+    },
+
     async renameItem() {
       const { path, key_path } = this.contextmenu
       const { isFolder } = this.menuOptions
@@ -373,12 +530,16 @@ export default {
     },
 
     async showContextMenu(e) {
+      // right-clicking empty space leaves the selection behind
+      if (!e.component) this.$store.commit('CLEAR_SELECTION')
+
       this.contextmenu.show = true
       this.contextmenu.path = e.path
       this.contextmenu.locked = e.locked
       this.contextmenu.folders = e.folders
       this.contextmenu.encrypted = e.encrypted
       this.contextmenu.key_path = e.key_path
+      this.contextmenu.selection = e.selection || []
       this.contextmenu.component = e.component
 
       await this.$nextTick()
@@ -398,10 +559,20 @@ export default {
       this.contextmenu.folders = []
       this.contextmenu.encrypted = false
       this.contextmenu.key_path = null
+      this.contextmenu.selection = []
       this.contextmenu.component = null
     }
   }
 }
+
+const escapeHtml = text =>
+  String(text).replace(
+    /[&<>"']/g,
+    c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[
+        c
+      ])
+  )
 </script>
 
 <style lang="scss">
@@ -410,7 +581,8 @@ export default {
     @apply absolute text-gray-800 text-xl;
 
     ul {
-      @apply bg-white w-48 rounded shadow-md;
+      @apply bg-white rounded shadow-md whitespace-no-wrap;
+      min-width: 12rem;
     }
 
     li {
