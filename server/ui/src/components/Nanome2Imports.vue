@@ -5,6 +5,9 @@
         <div class="p-4">
           <h2>Add to a Nanome 2 workspace</h2>
           <p class="text-gray-700 break-all">{{ picker.label }}</p>
+          <p v-if="picker.account" class="account">
+            Workspaces of <b>{{ picker.account }}</b>
+          </p>
           <input
             ref="filter"
             v-model="picker.filter"
@@ -56,6 +59,9 @@
           </button>
         </div>
         <div class="text-gray-700 break-all">{{ job.label }}</div>
+        <div v-if="job.account" class="account">
+          Nanome 2 account: <b>{{ job.account }}</b>
+        </div>
 
         <div class="overflow-hidden h-1 rounded bg-gray-400 my-2">
           <div
@@ -78,6 +84,11 @@
             <fa-icon icon="external-link-alt" class="mr-1" />
             open the workspace
           </a>
+          <p v-if="job.account" class="account">
+            {{ hostOf(job.result.url) }} shows it when logged in as
+            <b>{{ job.account }}</b
+            >.
+          </p>
           <p v-if="job.result.verification.text">
             {{ job.result.verification.text }}
           </p>
@@ -249,14 +260,22 @@ export default {
           : `${plural(paths.length, 'file')} in ${folderOf(paths[0])}`
       if (!pick) return this.load(paths, label, null)
 
-      this.picker = { paths, label, workspaces: [], loading: true, filter: '' }
+      this.picker = {
+        paths,
+        label,
+        account: null,
+        workspaces: [],
+        loading: true,
+        filter: ''
+      }
       this.$nextTick(() => this.$refs.filter && this.$refs.filter.focus())
       try {
-        const workspaces = await listWorkspaces({
+        const { account, workspaces } = await listWorkspaces({
           token: this.$store.state.token,
           url: this.$store.state.nanome2.url
         })
         if (this.picker) {
+          this.picker.account = account
           this.picker.workspaces = workspaces
           this.picker.loading = false
         }
@@ -311,12 +330,15 @@ export default {
         message: 'Starting…',
         percent: 2,
         log: [],
+        // the Nanome 2 account the work lands in
+        account: null,
         result: null,
         error: null
       }
       this.jobs.push(job)
 
-      const onProgress = ({ step, message }) => {
+      const onProgress = ({ step, message, account }) => {
+        if (account) job.account = account
         const at = steps.indexOf(step)
         if (at >= 0) {
           job.percent = Math.max(2, Math.round((100 * at) / (steps.length - 1)))
@@ -388,6 +410,12 @@ export default {
 
     remove(job) {
       this.jobs.splice(this.jobs.indexOf(job), 1)
+    },
+
+    hostOf(url) {
+      return String(url)
+        .replace(/^https?:\/\//, '')
+        .split('/')[0]
     },
 
     isLink(url) {
@@ -465,6 +493,10 @@ const escapeHtml = text =>
       @apply bg-gray-200 outline-none;
     }
   }
+}
+
+.account {
+  @apply text-sm text-gray-700 break-words;
 }
 
 .card + .card {

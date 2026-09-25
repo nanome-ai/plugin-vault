@@ -10,6 +10,7 @@ const state = {
   token: localStorage.getItem('user-token') || null,
   unique: null,
   name: null,
+  email: null,
   org: null,
   extensions: {
     supported: [],
@@ -69,6 +70,7 @@ async function saveSession(commit, { success, results }) {
     const user = {
       unique: results.user.unique,
       name: results.user.name,
+      email: results.user.email || null,
       token: results.token.value,
       org: results.organization && `org-${results.organization.id}`
     }
@@ -122,6 +124,7 @@ const actions = {
     commit('PATCH_USER', {
       token: null,
       name: null,
+      email: null,
       unique: null,
       org: null
     })

@@ -44,7 +44,10 @@
       <div class="text-left">
         <div class="text-lg px-4 py-2 ml-4 rounded bg-gray-200 inline">
           <template v-if="name">
-            Welcome <b>{{ name }}!</b>&nbsp;
+            Welcome <b>{{ name }}!</b>
+            <!-- the account files are opened in Nanome 2 as -->
+            <span v-if="email" class="ml-1 text-gray-600">({{ email }})</span
+            >&nbsp;
             <a @click="$store.dispatch('logout')" class="link text-red-500"
               >log out</a
             >
@@ -69,7 +72,14 @@ import Nanome2Banner from '@/components/Nanome2Banner'
 export default {
   components: { FileExplorer, Nanome2Banner },
   data: () => ({ showMore: false }),
-  computed: mapState(['authEnabled', 'token', 'name', 'extensions', 'message'])
+  computed: mapState([
+    'authEnabled',
+    'token',
+    'name',
+    'email',
+    'extensions',
+    'message'
+  ])
 }
 </script>
 

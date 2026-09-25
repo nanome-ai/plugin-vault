@@ -47,7 +47,9 @@ const trimSlash = url => String(url || '').replace(/\/+$/, '')
 
 // MARA and the Workspace API check a login with the accounts API MARA names in
 // /api/info. Vault logs in at api.nanome.ai, so make sure that API takes it
-// before changing anything. Returns MARA's /api/info.
+// before changing anything. Returns MARA's /api/info and the account the login
+// belongs to: what Vault creates lands there, and app.nanome.ai only shows it
+// when logged in as the same account.
 async function checkLogin(ImportFailure, url, token) {
   let info
   try {
@@ -57,7 +59,7 @@ async function checkLogin(ImportFailure, url, token) {
   }
 
   const accounts = trimSlash(info.accounts_api_url)
-  if (!accounts) return info
+  if (!accounts) return { info, account: null }
 
   const res = await fetch(`${accounts}/user/session`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -71,7 +73,20 @@ async function checkLogin(ImportFailure, url, token) {
       { status: res && res.status, body: JSON.stringify(body) }
     )
   }
-  return info
+
+  const user = (body.results && body.results.user) || {}
+  return { info, account: user.email || user.name || user.unique || null }
+}
+
+// reports the account in the progress, for the card to show
+async function checkLoginWithProgress(ImportFailure, url, token, onProgress) {
+  onProgress({ step: 'token', message: 'Checking your login with Nanome 2' })
+  const login = await checkLogin(ImportFailure, url, token)
+  if (login.account) {
+    const message = `Using the Nanome 2 account ${login.account}`
+    onProgress({ step: 'token', message, account: login.account })
+  }
+  return login
 }
 
 // JSON requests to the Workspace API, sent the way the web app sends them
@@ -111,17 +126,19 @@ function workspaceApi(ImportFailure, info, token) {
   }
 }
 
-// the user's workspaces, most recently opened first, as the web app lists them
+// the account's workspaces, most recently opened first, as the web app lists
+// them: {account, workspaces}
 export async function listWorkspaces({ token, url }) {
   const { ImportFailure } = await loadPipeline()
-  const info = await checkLogin(ImportFailure, url, token)
+  const { info, account } = await checkLogin(ImportFailure, url, token)
   const request = workspaceApi(ImportFailure, info, token)
   const list = await request('workspaces', 'GET', '/workspaces')
 
   const opened = w => new Date(w.lastAccessedAt || w.updatedAt || 0)
-  return (Array.isArray(list) ? list : [])
+  const workspaces = (Array.isArray(list) ? list : [])
     .filter(w => w && w.id)
     .sort((a, b) => opened(b) - opened(a))
+  return { account, workspaces }
 }
 
 // loads structure files into `workspace` ({id, name}), or into a new
@@ -145,8 +162,12 @@ export async function loadStructures(options) {
     }
   }
 
-  onProgress({ step: 'token', message: 'Checking your login with Nanome 2' })
-  const info = await checkLogin(ImportFailure, url, token)
+  const { info } = await checkLoginWithProgress(
+    ImportFailure,
+    url,
+    token,
+    onProgress
+  )
   const request = workspaceApi(ImportFailure, info, token)
 
   const partial = {}
@@ -244,8 +265,7 @@ export async function openInNanome2({ path, token, url, toolId, onProgress }) {
     throw new ImportFailure('vault', e.message)
   }
 
-  onProgress({ step: 'token', message: 'Checking your login with Nanome 2' })
-  await checkLogin(ImportFailure, url, token)
+  await checkLoginWithProgress(ImportFailure, url, token, onProgress)
 
   return runImport({
     bytes,
