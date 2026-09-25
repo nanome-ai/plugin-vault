@@ -24,6 +24,12 @@ Using [Gotenberg](https://github.com/thecodingmachine/gotenberg), the following 
 - Documents: `.doc` `.docx` `.txt` `.rtf` `.odt`
 - Presentations: `.ppt` `.pptx` `.odp`
 
+### Web UI
+
+- **Select** files and folders with a click, ctrl/cmd-click, shift-click, the checkboxes, or ctrl/cmd+A. Esc or a click on empty space clears the selection.
+- **Download** a file with a double-click or its right-click menu. A folder downloads as a zip from its right-click menu, and a selection of several items downloads as one zip from the toolbar or the right-click menu. Files in an encrypted folder are decrypted with its key. Encrypted folders inside a selection need their own key, so they are left out and named after the download starts.
+- **Open in Nanome 2** is in the right-click menu of `.nanome` and `.nanoscenes` files (v1 sessions). The page sends the session to the Nanome v1 Session Importer tool on the Nanome 2 web app (MARA), builds a new Nanome 2 workspace from the result, reads it back to check it, and links it in a card at the bottom left. It uses the Vault login, so it asks for one first. The import runs in the page, so the tab has to stay open until it finishes; a large session can take several minutes. The import code comes from [nanome-ai/open-in-nanome-2](https://github.com/nanome-ai/open-in-nanome-2) (`server/ui/src/nanome2/pipeline.js`, copied without its references to private source files), which also documents each step and its limits.
+
 ## Usage
 
 To run Vault in a Docker container:
@@ -44,6 +50,10 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 
   Enables enforced authentication, preventing users from accessing files in the Web UI unless they are logged in.
 
+- `--disable-nanome2`
+
+  Hide Open in Nanome 2, for example when browsers using this Vault cannot reach the Nanome 2 web app.
+
 - `--https`
 
   Enable HTTPS using a self-signed certificate. If port is not set, port will default to 443.
@@ -51,6 +61,14 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 - `--keep-files-days days`
 
   Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `--keep-files-days 14`
+
+- `--nanome2-url url`
+
+  The Nanome 2 web app that Open in Nanome 2 uses. Defaults to `https://app.nanome.ai`.
+
+- `--nanome2-tool-id id`
+
+  The id of the Nanome v1 Session Importer tool on that web app. Defaults to `01M32ZZKF3RPH80EBW73T2VVKZ`.
 
 - `--ui-message message`
 
@@ -107,7 +125,18 @@ $ yarn install
 $ yarn run serve
 ```
 
-Note: this will only work if the Vault server is running on the default port (without using the `-w` option). To work with a non-default port, change the proxy settings in `vue.config.js`.
+Note: this proxies API requests to a Vault server on `http://localhost`. For a server on another port, set `VAULT_SERVER`, e.g. `VAULT_SERVER=http://localhost:8420 yarn run serve`.
+
+The UI build (Vue CLI 3, webpack 4) needs Node 16, the version in `docker/server.Dockerfile`.
+
+---
+
+To run the tests (Node 16 or newer):
+
+```sh
+$ cd server && yarn test
+$ cd server/ui && yarn test
+```
 
 ## License
 
