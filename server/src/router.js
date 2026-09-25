@@ -4,6 +4,7 @@ const router = express.Router()
 const config = require('@/config')
 const Upload = require('@/services/upload')
 const Vault = require('@/services/vault-manager')
+const Zip = require('@/services/zip')
 const asyncWrap = require('@/utils/async-wrap')
 const auth = require('@/utils/auth')
 const { HTTPError } = require('@/utils/error')
@@ -13,8 +14,19 @@ const STATIC_DIR = require('path').resolve('ui/dist')
 router.get('/info', (req, res) => {
   res.success({
     extensions: Vault.EXTENSIONS,
-    message: config.UI_MESSAGE
+    message: config.UI_MESSAGE,
+    nanome2: config.NANOME2_URL
+      ? { url: config.NANOME2_URL, toolId: config.NANOME2_TOOL_ID }
+      : null
   })
+})
+
+// no auth header here: the id comes from an authorized 'zip' command and is
+// only good once, so the browser can download it natively
+router.get('/zip/:id/:name?', (req, res) => {
+  const plan = Zip.take(req.params.id)
+  if (!plan) throw new HTTPError(404, 'Download expired, please try again')
+  Zip.send(plan, res)
 })
 
 router.get('/files(/*)?', auth, (req, res) => {
@@ -47,7 +59,8 @@ router.post(
       'delete',
       'rename',
       'upload',
-      'upload-init'
+      'upload-init',
+      'zip'
     ].includes(command)
     if (needsKey && !Vault.isKeyValid(path, key)) throw HTTPError.FORBIDDEN
 
@@ -121,6 +134,29 @@ router.post(
       case 'verify':
         const success = Vault.isKeyValid(path, key)
         return res.success({ success })
+
+      case 'zip':
+        let items = []
+        if (req.fields.items) {
+          try {
+            items = JSON.parse(req.fields.items)
+          } catch (e) {
+            throw new HTTPError(400, 'Invalid arg: "items"')
+          }
+          const valid = Array.isArray(items)
+          if (!valid || !items.every(i => typeof i === 'string')) {
+            throw new HTTPError(400, 'Invalid arg: "items"')
+          }
+        }
+
+        const plan = Zip.plan(path, items, key, name)
+        return res.success({
+          id: Zip.create(plan),
+          name: plan.name,
+          files: plan.files,
+          bytes: plan.bytes,
+          skipped: plan.skipped
+        })
 
       default:
         throw new HTTPError(400, 'Invalid command')
