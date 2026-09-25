@@ -41,7 +41,8 @@ if (process.env.NANOME2_URL) {
 if (process.env.NANOME2_TOOL_ID) {
   config.NANOME2_TOOL_ID = process.env.NANOME2_TOOL_ID
 }
-let disableNanome2 = (process.env.DISABLE_NANOME2 || '').toLowerCase() === 'true'
+let disableNanome2 =
+  (process.env.DISABLE_NANOME2 || '').toLowerCase() === 'true'
 if (process.env.UI_MESSAGE) {
   config.UI_MESSAGE = process.env.UI_MESSAGE
 }
@@ -76,6 +77,8 @@ while (args.length) {
 }
 
 // Open in Nanome 2 runs in the browser against this Nanome 2 web app (MARA)
-config.NANOME2_URL = disableNanome2 ? '' : config.NANOME2_URL.replace(/\/+$/, '')
+config.NANOME2_URL = disableNanome2
+  ? ''
+  : config.NANOME2_URL.replace(/\/+$/, '')
 
 module.exports = config

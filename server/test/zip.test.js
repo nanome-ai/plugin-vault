@@ -44,7 +44,9 @@ const zipToFile = plan =>
   })
 
 const names = file =>
-  execFileSync('unzip', ['-Z1', file], { encoding: 'utf8' }).trim().split('\n')
+  execFileSync('unzip', ['-Z1', file], { encoding: 'utf8' })
+    .trim()
+    .split('\n')
 const read = (file, name) =>
   execFileSync('unzip', ['-p', file, name], { encoding: 'utf8' })
 
@@ -99,17 +101,41 @@ test('items outside the folder, hidden items and the vault root are refused', ()
     }
     return 'no error'
   }
-  assert.strictEqual(status(() => Zip.plan('shared/proj/', ['../a.pdb'])), 400)
-  assert.strictEqual(status(() => Zip.plan('shared/proj/', ['sub/../../x'])), 400)
-  assert.strictEqual(status(() => Zip.plan('shared/proj/', ['/etc/passwd'])), 400)
-  assert.strictEqual(status(() => Zip.plan('shared/proj/', ['.hidden'])), 400)
-  assert.strictEqual(status(() => Zip.plan('shared/proj/', ['missing.pdb'])), 404)
-  assert.strictEqual(status(() => Zip.plan('', [])), 403)
-  assert.strictEqual(status(() => Zip.plan('shared/proj/locked/', ['d.pdb', 'x/..'])), 400)
+  assert.strictEqual(
+    status(() => Zip.plan('shared/proj/', ['../a.pdb'])),
+    400
+  )
+  assert.strictEqual(
+    status(() => Zip.plan('shared/proj/', ['sub/../../x'])),
+    400
+  )
+  assert.strictEqual(
+    status(() => Zip.plan('shared/proj/', ['/etc/passwd'])),
+    400
+  )
+  assert.strictEqual(
+    status(() => Zip.plan('shared/proj/', ['.hidden'])),
+    400
+  )
+  assert.strictEqual(
+    status(() => Zip.plan('shared/proj/', ['missing.pdb'])),
+    404
+  )
+  assert.strictEqual(
+    status(() => Zip.plan('', [])),
+    403
+  )
+  assert.strictEqual(
+    status(() => Zip.plan('shared/proj/locked/', ['d.pdb', 'x/..'])),
+    400
+  )
 })
 
 test('a selection of only locked folders is refused', () => {
-  assert.throws(() => Zip.plan('shared/proj/', ['locked/']), /Nothing to download/)
+  assert.throws(
+    () => Zip.plan('shared/proj/', ['locked/']),
+    /Nothing to download/
+  )
 })
 
 test('a zip id works once', () => {
@@ -163,4 +189,3 @@ test('the zip command and route work over HTTP', async () => {
     server.close()
   }
 })
-

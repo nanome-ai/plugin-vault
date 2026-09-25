@@ -105,7 +105,10 @@ exports.plan = (path, items = [], key, name) => {
   }
 
   if (!plan.entries.length) {
-    throw new HTTPError(400, 'Nothing to download: encrypted folders are left out')
+    throw new HTTPError(
+      400,
+      'Nothing to download: encrypted folders are left out'
+    )
   }
   if (plan.bytes > MAX_BYTES) {
     const gb = (plan.bytes / 1024 ** 3).toFixed(1)
@@ -134,13 +137,15 @@ exports.take = id => {
 
 const contentDisposition = name => {
   const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'")
-  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(
+    name
+  )}`
 }
 
 // read and decrypt only when the archive gets to this entry
 const decrypted = (path, key) =>
   Readable.from(
-    (async function* () {
+    (async function*() {
       yield Vault.decryptData(await fs.readFile(path), key)
     })(),
     { objectMode: false }
