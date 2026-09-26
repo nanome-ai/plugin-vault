@@ -230,14 +230,30 @@ export default {
     // v1 sessions: each becomes its own new workspace
     async openSessions(paths) {
       const { nanome2 } = this.$store.state
-      if (!nanome2 || !(await this.loggedIn())) return
+      const running = path =>
+        this.jobs.some(j => j.label === path && j.state === 'running')
+      paths = paths.filter(path => !running(path))
+      if (!nanome2 || !paths.length) return
+
+      // the conversion is not exact, so it is agreed to every time
+      const agreed = await this.$modal.confirm({
+        title: 'Experimental Conversion',
+        body:
+          'Converting Nanome Classic sessions to Nanome 2 is experimental. ' +
+          'The new workspace may not match the original exactly: some ' +
+          'representations, colors, measurements and other session details ' +
+          'can differ or be left out. The session file in Vault stays as it ' +
+          'is, and the progress card lists what the converter could not ' +
+          'carry over.',
+        acknowledge:
+          'I understand the converted workspace may differ from the ' +
+          'original session.',
+        okTitle: paths.length === 1 ? 'convert' : `convert ${paths.length}`,
+        cancelClass: ''
+      })
+      if (!agreed || !(await this.loggedIn())) return
 
       for (const path of paths) {
-        const busy = this.jobs.some(
-          j => j.label === path && j.state === 'running'
-        )
-        if (busy) continue
-
         this.run('session', path, onProgress =>
           openInNanome2({
             path,
