@@ -73,8 +73,17 @@ const walk = (plan, dir, prefix) => {
 // itself is zipped under a top folder called `name`.
 exports.plan = (path, items = [], key, name) => {
   const base = Vault.getVaultPath(path)
-  if (ospath.resolve(base) === ospath.resolve(Vault.FILES_DIR)) {
+  const root = ospath.resolve(Vault.FILES_DIR)
+  if (ospath.resolve(base) === root) {
     throw HTTPError.FORBIDDEN
+  }
+  // the file explorer does not offer it either (400: a 403 asks for a key)
+  if (!items.length && ospath.resolve(base) === ospath.join(root, 'shared')) {
+    throw new HTTPError(
+      400,
+      "The shared folder holds everyone's files, so it is not zipped whole: " +
+        'select what to download in it'
+    )
   }
   if (!fs.statSync(base).isDirectory()) {
     throw new HTTPError(400, 'Not a folder')

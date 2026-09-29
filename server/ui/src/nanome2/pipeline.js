@@ -134,10 +134,20 @@ function summaryStructureLines(summary) {
   const listed = [];
   for (let i = start + 1; i < lines.length && lines[i].trim(); i++) {
     const m = /^\s+(\d+)\. ([A-Za-z0-9_.]+\.(?:pdb|cif|sdf)) - (.*), (\d+) atoms(?:,|$)/.exec(lines[i]);
-    if (m) listed.push({ index: Number(m[1]), file: m[2], name: m[3], atoms: Number(m[4]) });
+    if (m) listed.push({ index: Number(m[1]), file: m[2], name: m[3], atoms: Number(m[4]), openFrame: openingFrame(lines[i]) });
     else if (/^\s+\d+\. /.test(lines[i])) return null;
   }
   return listed;
+}
+
+/** The frame v1 opens a structure on (1-based) when the file holds every frame: the summary
+ * line reads "..., 5 frames; v1 opens it on frame 3" (tool_main.py convert()). Null otherwise,
+ * including "only frame 3 of 90 written", where the file holds that one frame. */
+function openingFrame(line) {
+  const m = /, (\d+) frames; v1 opens it on frame (\d+)/.exec(line);
+  if (!m) return null;
+  const frame = Number(m[2]);
+  return frame >= 1 && frame <= Number(m[1]) ? frame : null;
 }
 
 /** The complex name the tool gave a file `<base>_NN_<name>.<ext>`, or the file's stem. */
@@ -190,6 +200,9 @@ export function parseToolOutputs(summary, filenames) {
   const optional = suffix => (files.includes(base + suffix) ? base + suffix : null);
   const annotationsFile = optional('_annotations.json');
   const measurementsFile = optional('_measurements.json');
+  // v1's metadata in full (Frames > Meta Data); v2 has no place for most of it, so it is
+  // returned to the user with the tool run rather than loaded.
+  const metadataFile = optional('_metadata.json');
   if (!annotationsFile && summary.includes(`${base}_annotations.json`)) {
     throw new Error(`the summary names ${base}_annotations.json but MARA did not return it`);
   }
@@ -197,11 +210,13 @@ export function parseToolOutputs(summary, filenames) {
     ...s,
     name: (listed && listed[i].name) || nameFromFile(s.file, base),
     atoms: listed ? listed[i].atoms : null,
+    openFrame: listed ? listed[i].openFrame : null,
   }));
-  const used = new Set([componentsFile, annotationsFile, measurementsFile, ...structures.map(s => s.file)]);
+  const used = new Set([componentsFile, annotationsFile, measurementsFile, metadataFile, ...structures.map(s => s.file)]);
   const unused = files.filter(f => !used.has(f));
   if (unused.length) warnings.push(`MARA returned files this import does not use: ${unused.join(', ')}`);
-  return { base, componentsFile, annotationsFile, measurementsFile, structures, warnings };
+  return { base, componentsFile, annotationsFile, measurementsFile, metadataFile, structures, warnings,
+    description: summaryDescription(summary) };
 }
 
 /**
@@ -224,9 +239,19 @@ export function convertedOutputs(converted) {
     const m = /\.(pdb|cif|sdf)$/i.exec(file);
     if (!m) throw new Error(`${file}: expected a .pdb, .cif or .sdf file`);
     const given = Array.isArray(names) && typeof names[i] === 'string' && names[i] ? names[i] : null;
-    return { index: i + 1, file, format: m[1].toLowerCase(), name: given || (listedMatches ? listed[i].name : nameFromFile(file, base)), atoms: listedMatches ? listed[i].atoms : null };
+    return { index: i + 1, file, format: m[1].toLowerCase(), name: given || (listedMatches ? listed[i].name : nameFromFile(file, base)), atoms: listedMatches ? listed[i].atoms : null,
+      openFrame: listedMatches ? listed[i].openFrame : null };
   });
-  return { base, baseUrl: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`, componentsFile: components, annotationsFile: annotations, structures, warnings: [] };
+  return { base, baseUrl: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`, componentsFile: components, annotationsFile: annotations, structures, warnings: [],
+    description: summaryDescription(summary) };
+}
+
+/** What the tool asks the workspace description to say (tool_main.py _description: the title,
+ * method and resolution of each structure's PDB / mmCIF header), from its first build step
+ * "  1. Create Nanome Workspace, description: <text>.", or ''. */
+export function summaryDescription(summary) {
+  const m = /^\s+1\. Create Nanome Workspace, description: (.*)\.$/m.exec(String(summary || ''));
+  return m ? m[1].trim() : '';
 }
 
 /** Everything the tool said after its build instructions: what was not carried over, placement,
@@ -714,9 +739,45 @@ export function parseSdfModels(text) {
     const n = models.length + 1;
     if (record.length < 4) throw new Error(`record ${n} is too short`);
     const { atoms, bonds } = record[3].includes('V3000') ? sdfV3000(record.slice(4)) : sdfV2000(record, n);
-    models.push({ serial: n, atoms, bonds: bondList(bonds), allBonds: true });
+    const ctabEnd = record.findIndex(line => line.startsWith('M  END'));
+    models.push({ serial: n, atoms, bonds: bondList(bonds), allBonds: true, title: record[0],
+      data: ctabEnd < 0 ? {} : sdfDataItems(record.slice(ctabEnd + 1)) });
   }
   return models;
+}
+
+/** An SDF record's data items the way v2's SdfParser reads them (AcceptNonStructuralData):
+ * a '>' line names the item by the text between its first '<' and last '>', the lines up to the
+ * next empty one are its value. */
+export function sdfDataItems(lines) {
+  const data = {};
+  let key = null;
+  let values = [];
+  for (const line of lines) {
+    if (key === null) {
+      if (line === '' || !line.startsWith('>')) continue;
+      const begin = line.indexOf('<');
+      const end = line.lastIndexOf('>');
+      if (begin < 0 || end < 0) continue;
+      key = line.slice(begin + 1, end);
+      values = [];
+    } else if (line === '') {
+      data[key] = values;
+      key = null;
+    } else {
+      values.push(line);
+    }
+  }
+  return data;
+}
+
+/** The metadata v2 keeps for an SDF record: its data items, with the record's title first in the
+ * item named Name (any case), which v2 adds when there is none. */
+export function v2SdfMetadata(model) {
+  const data = { ...model.data };
+  const nameKey = Object.keys(data).find(k => k.toLowerCase() === 'name') || 'Name';
+  data[nameKey] = [model.title, ...(data[nameKey] || []).filter(v => v !== model.title)];
+  return data;
 }
 
 export function parseStructure(text, format) {
@@ -877,6 +938,24 @@ export function compareModel(expected, stored, { samples = DEFAULTS.verifyAtoms,
     notes.push('v2 returned no bonding');
   }
 
+  // An SDF record's data items (v1's Frames > Meta Data for that frame) against the metadata v2
+  // stored for the model: every item, line for line, and nothing else.
+  const metadata = { items: 0, matched: 0, missing: [], differ: [], extra: [] };
+  if (format === 'sdf' && expected.data) {
+    const want = v2SdfMetadata(expected);
+    const got = s.metaData && typeof s.metaData === 'object' ? s.metaData : {};
+    for (const [key, lines] of Object.entries(want)) {
+      metadata.items++;
+      if (!Array.isArray(got[key])) metadata.missing.push(key);
+      else if (got[key].length !== lines.length || got[key].some((v, i) => v !== lines[i])) metadata.differ.push(key);
+      else metadata.matched++;
+    }
+    metadata.extra = Object.keys(got).filter(key => !(key in want));
+    if (metadata.missing.length) problems.push(`${metadata.missing.length} data item(s) of the file are not in v2's metadata: ${listing(metadata.missing)}`);
+    if (metadata.differ.length) problems.push(`${metadata.differ.length} data item(s) hold other values in v2: ${listing(metadata.differ)}`);
+    if (metadata.extra.length) problems.push(`${metadata.extra.length} metadata item(s) in v2 are not in the file: ${listing(metadata.extra)}`);
+  }
+
   // A few atoms side by side.
   const sample = sampleIndices(expected.atoms.length, samples).map(k => {
     const atom = expected.atoms[k];
@@ -905,6 +984,7 @@ export function compareModel(expected, stored, { samples = DEFAULTS.verifyAtoms,
     elements,
     charges,
     bonds,
+    metadata,
     sample,
     problems,
     notes,
@@ -1167,9 +1247,10 @@ async function importSession(o, deps, ctx, progress) {
   step('workspace');
   const workspaceName = o.workspaceName || workspaceNameFor(filename);
   progress('workspace', `Creating workspace "${workspaceName}"`);
-  const description = source.toolRun
+  const description = (source.toolRun
     ? `Converted from the Nanome v1 session ${filename} (MARA tool run ${source.toolRun.id}).`
-    : `Converted from the Nanome v1 session ${filename} by a local converter (${outputs.baseUrl}).`;
+    : `Converted from the Nanome v1 session ${filename} by a local converter (${outputs.baseUrl}).`)
+    + (outputs.description ? ` ${outputs.description}` : '');
   const workspace = await http.json('workspace', 'POST', `${ws}/workspaces`, { json: { name: workspaceName, description } });
   if (!workspace || !workspace.id) throw new ImportFailure('workspace', 'the Workspace API returned no workspace id', { body: JSON.stringify(workspace) });
   const url = `${mara}/workspaces/${encodeURIComponent(workspace.id)}`;
@@ -1214,6 +1295,7 @@ async function importSession(o, deps, ctx, progress) {
       file: u.file,
       format: u.format,
       models: Array.isArray(entry.models) ? entry.models.length : null,
+      openFrame: u.openFrame || null,
       loadSeconds: Math.round(seconds * 10) / 10,
     });
     ctx.partial.entries = entries.map(({ serial, name, file, loadSeconds }) => ({ serial, name, file, loadSeconds }));
@@ -1256,7 +1338,30 @@ async function importSession(o, deps, ctx, progress) {
     }
   }
 
-  // 8. Annotations through GraphQL, one mutation per type.
+  // 8. The frame each entry opens on. v2 opens every entry on its first model;
+  // where v1 opens a structure on another frame (a Vault upload or
+  // scene deck on its last, a conformer set on the one saved), the scene is set to that model.
+  // The files number their models 1..N in v1's frame order (PDB MODEL, mmCIF
+  // pdbx_PDB_model_num, SDF records), which is how v2 numbers them.
+  step('frames');
+  const openedOn = new Map(); // entry serial -> model serial set
+  for (const entry of entries) {
+    if (!entry.openFrame || entry.openFrame === 1) continue;
+    if (entry.models !== null && entry.openFrame > entry.models) {
+      warnings.push(`Entry ${entry.serial} (${entry.name}): v1 opens it on frame ${entry.openFrame}, but v2 made ${entry.models} model(s); left on the first.`);
+      continue;
+    }
+    progress('frames', `Opening ${entry.name} on frame ${entry.openFrame}, as v1 does`);
+    try {
+      await http.json('frames', 'POST', `${wsBase}/scenes/${scene.serial}/entries/${entry.serial}/model-serial`, { json: { modelSerial: entry.openFrame } });
+    } catch (e) {
+      if (e instanceof ImportFailure) e.message += ` (entry ${entry.serial}, ${entry.name}, frame ${entry.openFrame})`;
+      throw e;
+    }
+    openedOn.set(entry.serial, entry.openFrame);
+  }
+
+  // 9. Annotations through GraphQL, one mutation per type.
   step('annotations');
   let annotationCount = 0;
   if (annotations.length) {
@@ -1277,7 +1382,7 @@ async function importSession(o, deps, ctx, progress) {
     }
   }
 
-  // 9. Read back what v2 stored.
+  // 10. Read back what v2 stored.
   let verification = { ok: null, skipped: true, text: 'Not verified.', entries: [], problems: [], notes: [] };
   if (o.verify !== false) {
     step('verify');
@@ -1285,7 +1390,7 @@ async function importSession(o, deps, ctx, progress) {
     warnings.push(...verification.problems.map(p => `Verification: ${p}`));
   }
 
-  // 10. Optionally drop MARA's copy of the upload and outputs.
+  // 11. Optionally drop MARA's copy of the upload and outputs.
   if (o.deleteToolRun && source.toolRun) {
     step('cleanup');
     try {
@@ -1306,7 +1411,7 @@ async function importSession(o, deps, ctx, progress) {
     summary,
     notes: summaryNotes(summary),
     warnings,
-    entries: entries.map(({ serial, name, file, format, loadSeconds }) => ({ serial, name, file, format, loadSeconds })),
+    entries: entries.map(({ serial, name, file, format, openFrame, loadSeconds }) => ({ serial, name, file, format, openFrame, loadSeconds })),
     components: toAdd.length,
     hiddenComponents: hiddenSerials.length,
     annotations: annotationCount,
@@ -1319,7 +1424,8 @@ async function importSession(o, deps, ctx, progress) {
 async function verifyImport(http, { wsBase, scene, entries, textOf, componentCount, hiddenSerials = [], annotationCount, o, progress }) {
   const report = {
     ok: true, skipped: false, detail: o.verifyDetail, tolerance: o.tolerance, entries: [], problems: [], notes: [],
-    models: 0, atoms: 0, maxDeviation: 0, elementMismatches: 0, chargeMismatches: 0, bondMismatches: 0, text: '',
+    models: 0, atoms: 0, maxDeviation: 0, elementMismatches: 0, chargeMismatches: 0, bondMismatches: 0,
+    metadataItems: 0, metadataMismatches: 0, text: '',
   };
   for (const [i, entry] of entries.entries()) {
     progress('verify', `Checking entry ${entry.serial} (${entry.name}) against ${entry.file}`, { index: i + 1, total: entries.length });
@@ -1355,6 +1461,8 @@ async function verifyImport(http, { wsBase, scene, entries, textOf, componentCou
       report.elementMismatches += check.elements.mismatches;
       report.chargeMismatches += check.charges.mismatches;
       report.bondMismatches += check.bonds.missing + check.bonds.kindMismatches + (check.bonds.extra || 0);
+      report.metadataItems += check.metadata.items;
+      report.metadataMismatches += check.metadata.missing.length + check.metadata.differ.length + check.metadata.extra.length;
     }
   }
   for (const result of report.entries) {
@@ -1397,11 +1505,26 @@ async function verifyImport(http, { wsBase, scene, entries, textOf, componentCou
     if (unmeant.length) report.problems.push(`${unmeant.length} component(s) are hidden that the import did not hide: ${listing(unmeant.map(c => named(c.serial)))}`);
   }
 
+  // Each entry shows the frame v1 opens it on (step 8), the first where v1 does too.
+  report.framesSet = entries.filter(e => e.openFrame && e.openFrame > 1).length;
+  try {
+    const scenes = await http.json('verify', 'GET', `${wsBase}/scenes`);
+    const now = (Array.isArray(scenes) ? scenes : []).find(s => s && s.serial === scene.serial);
+    const shown = new Map(((now && now.entryModelSerial) || []).map(m => [m.entrySerial, m.modelSerial]));
+    const wrong = entries.filter(e => shown.get(e.serial) !== (e.openFrame || 1));
+    if (wrong.length) {
+      report.problems.push(`${wrong.length} entr${wrong.length === 1 ? 'y shows' : 'ies show'} another frame than v1 opens on: ${listing(wrong.map(e => `${e.serial} "${e.name}" on ${shown.get(e.serial)}, v1 on ${e.openFrame || 1}`))}`);
+    }
+  } catch (e) {
+    report.problems.push(`could not read the scene's current models: ${e.message}`);
+  }
+
   report.ok = report.problems.length === 0;
   const counts = `${report.models} model(s), ${report.atoms} atom(s), largest coordinate deviation ${report.maxDeviation.toFixed(4)} A`;
   const hiddenText = hiddenSerials.length ? ` (${hiddenSerials.length} hidden, as in v1)` : '';
   report.text = report.ok
-    ? `Verified ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}: ${counts}; elements, charges and bonds as in the files; ${componentCount} component(s)${hiddenText} and ${annotationCount} annotation(s) in the scene.` +
+    ? `Verified ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}: ${counts}; elements, charges and bonds as in the files${report.metadataItems ? `, ${report.metadataItems} SD data item(s) kept as v2 model metadata` : ''}; ${componentCount} component(s)${hiddenText} and ${annotationCount} annotation(s) in the scene` +
+      (report.framesSet ? `; ${report.framesSet} entr${report.framesSet === 1 ? 'y opens' : 'ies open'} on the frame v1 opens ${report.framesSet === 1 ? 'it' : 'them'} on` : '') + '.' +
       (report.notes.length ? ` ${report.notes.length} note(s) on differences v2 makes by design.` : '')
     : `Verification found ${report.problems.length} problem(s) (${counts}).`;
   return report;

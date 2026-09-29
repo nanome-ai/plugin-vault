@@ -52,7 +52,7 @@
           <button
             v-if="job.state !== 'running'"
             class="px-2 text-gray-600 hover:text-black"
-            title="close"
+            :title="job.state === 'queued' ? 'cancel' : 'close'"
             @click="remove(job)"
           >
             <fa-icon icon="times" />
@@ -84,6 +84,19 @@
             <fa-icon icon="external-link-alt" class="mr-1" />
             open the workspace
           </a>
+          <a
+            v-if="job.result.metadata"
+            :href="job.result.metadata.url"
+            :download="job.result.metadata.name"
+            class="btn rounded inline-block my-2"
+          >
+            <fa-icon icon="file-download" class="mr-1" />
+            v1 metadata
+          </a>
+          <p v-if="job.result.metadata" class="account">
+            The v1 metadata file holds everything v1 shows under Frames &gt;
+            Meta Data; Nanome 2 keeps only part of it.
+          </p>
           <p v-if="job.account" class="account">
             {{ hostOf(job.result.url) }} shows it when logged in as
             <b>{{ job.account }}</b
@@ -165,6 +178,7 @@ const plural = (n, what) => `${n} ${what}${n === 1 ? '' : 's'}`
 
 const TITLES = {
   session: {
+    queued: 'Waiting to open in Nanome 2',
     running: 'Opening in Nanome 2',
     ok: 'Opened in Nanome 2',
     warn: 'Opened in Nanome 2, with warnings',
@@ -186,8 +200,8 @@ export default {
   }),
 
   computed: {
-    running() {
-      return this.jobs.some(job => job.state === 'running')
+    busy() {
+      return this.jobs.some(job => ['queued', 'running'].includes(job.state))
     },
 
     filteredWorkspaces() {
@@ -200,9 +214,14 @@ export default {
     }
   },
 
+  created() {
+    // session conversions waiting their turn, one after another
+    this.queue = Promise.resolve()
+  },
+
   mounted() {
     const warnOnLeave = e => {
-      if (!this.running) return
+      if (!this.busy) return
       const msg = 'Open in Nanome 2 is still running and stops if you leave'
       e.preventDefault()
       e.returnValue = msg
@@ -230,9 +249,11 @@ export default {
     // v1 sessions: each becomes its own new workspace
     async openSessions(paths) {
       const { nanome2 } = this.$store.state
-      const running = path =>
-        this.jobs.some(j => j.label === path && j.state === 'running')
-      paths = paths.filter(path => !running(path))
+      const pending = path =>
+        this.jobs.some(
+          j => j.label === path && ['queued', 'running'].includes(j.state)
+        )
+      paths = paths.filter(path => !pending(path))
       if (!nanome2 || !paths.length) return
 
       // the conversion is not exact, so it is agreed to every time
@@ -253,15 +274,21 @@ export default {
       })
       if (!agreed || !(await this.loggedIn())) return
 
+      // one at a time: each is a MARA tool run and a workspace build, and
+      // many of those at once make every one of them slow
       for (const path of paths) {
-        this.run('session', path, onProgress =>
-          openInNanome2({
-            path,
-            token: this.$store.state.token,
-            url: nanome2.url,
-            toolId: nanome2.toolId,
-            onProgress
-          })
+        this.run(
+          'session',
+          path,
+          onProgress =>
+            openInNanome2({
+              path,
+              token: this.$store.state.token,
+              url: nanome2.url,
+              toolId: nanome2.toolId,
+              onProgress
+            }),
+          true
         )
       }
     },
@@ -336,15 +363,16 @@ export default {
       )
     },
 
-    async run(kind, label, start) {
+    // `queued` jobs wait for the queued ones before them
+    run(kind, label, start, queued = false) {
       const steps = kind === 'session' ? SESSION_STEPS : STRUCTURE_STEPS
       const job = {
         id: nextId++,
         kind,
         label,
-        state: 'running',
-        message: 'Starting…',
-        percent: 2,
+        state: queued ? 'queued' : 'running',
+        message: queued ? 'Waiting for the conversions before it' : 'Starting…',
+        percent: queued ? 0 : 2,
         log: [],
         // the Nanome 2 account the work lands in
         account: null,
@@ -363,13 +391,24 @@ export default {
         job.log.push(`[${step}] ${message}`)
       }
 
-      try {
-        const result = await start(onProgress)
-        if (kind === 'session') this.finishSession(job, result)
-        else this.finishStructures(job, result)
-      } catch (e) {
-        this.fail(job, e)
+      const go = async () => {
+        // closed while it waited
+        if (!this.jobs.includes(job)) return
+        job.state = 'running'
+        job.message = 'Starting…'
+        job.percent = 2
+        try {
+          const result = await start(onProgress)
+          if (kind === 'session') this.finishSession(job, result)
+          else this.finishStructures(job, result)
+        } catch (e) {
+          this.fail(job, e)
+        }
       }
+
+      if (!queued) return go()
+      this.queue = this.queue.then(go)
+      return this.queue
     },
 
     finishSession(job, result) {
@@ -384,7 +423,15 @@ export default {
         verification: {
           text: verification.text || '',
           notes: verification.notes || []
-        }
+        },
+        metadata: result.metadata
+          ? {
+              name: result.metadata.name,
+              url: URL.createObjectURL(
+                new Blob([result.metadata.text], { type: 'application/json' })
+              )
+            }
+          : null
       }
       job.state = warnings.length ? 'warn' : 'ok'
       job.percent = 100
@@ -402,7 +449,8 @@ export default {
         notes: [],
         problems: [],
         warnings: [],
-        verification: { text: '', notes: [] }
+        verification: { text: '', notes: [] },
+        metadata: null
       }
       job.state = 'ok'
       job.percent = 100
@@ -425,6 +473,8 @@ export default {
     },
 
     remove(job) {
+      const metadata = job.result && job.result.metadata
+      if (metadata) URL.revokeObjectURL(metadata.url)
       this.jobs.splice(this.jobs.indexOf(job), 1)
     },
 
@@ -459,6 +509,7 @@ export default {
 
     barClass(job) {
       return {
+        queued: 'bg-secondary',
         running: 'bg-secondary',
         ok: 'bg-green-500',
         warn: 'bg-yellow-500',

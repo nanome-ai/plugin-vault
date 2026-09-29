@@ -6,17 +6,18 @@
 //   components (without those an entry shows nothing).
 // - v1 sessions (.nanome / .nanoscenes) are converted with the Nanome 2
 //   importer tool on MARA into a new workspace, which is then read back and
-//   checked. pipeline.js does that. It is copied from
-//   nanome-ai/open-in-nanome-2 (a991347), where it is documented and tested.
-//   This repo is public, so the copy leaves out the upstream comments'
-//   references to private Nanome 2 source files; the code is the same. Change
-//   it there and copy it over the same way.
+//   checked. pipeline.js does that. It comes from the Open in Nanome 2 Chrome
+//   extension this replaces (nanome-ai/open-in-nanome-2 a41260f, retired),
+//   where its tests are. This repo is public, so the copy leaves out the
+//   upstream comments' references to private Nanome 2 source files; the code
+//   is the same.
 import API from '@/api'
 
 export const SESSION_FILE = /\.(nanome|nanoscenes)$/i
 
 // formats the Nanome 2 web app loads as structures that Vault also stores
-export const STRUCTURE_FILE = /\.(pdb|pqr|cif|mmcif|sdf|mol2|xyz)$/i
+// (it has no .mol2 loader)
+export const STRUCTURE_FILE = /\.(pdb|pqr|cif|mmcif|sdf|xyz)$/i
 
 // progress steps in the order each kind of job reports them
 export const SESSION_STEPS = [
@@ -32,6 +33,7 @@ export const SESSION_STEPS = [
   'load',
   'scene',
   'components',
+  'frames',
   'annotations',
   'verify',
   'cleanup',
@@ -267,12 +269,79 @@ export async function openInNanome2({ path, token, url, toolId, onProgress }) {
 
   await checkLoginWithProgress(ImportFailure, url, token, onProgress)
 
-  return runImport({
-    bytes,
-    filename,
-    token,
-    maraUrl: url,
-    toolId,
-    onProgress
+  // 'done' waits until MARA's copy of the session is deleted
+  let done = null
+  const progress = event => {
+    if (event.step === 'done') done = event
+    else onProgress(event)
+  }
+
+  let result
+  try {
+    result = await runImport({
+      bytes,
+      filename,
+      token,
+      maraUrl: url,
+      toolId,
+      onProgress: progress
+    })
+  } catch (e) {
+    const id = e.partial && e.partial.toolRunId
+    if (id) {
+      await deleteToolRun(url, token, id, onProgress).catch(() => {
+        e.message += ` MARA keeps its copy of the session (tool run ${id}).`
+      })
+    }
+    throw e
+  }
+
+  // MARA keeps each tool run, the uploaded session and everything converted
+  // from it, until the run is deleted. Vault has the session, so the run goes.
+  // First the one output the workspace does not take in, v1's metadata in
+  // full, is downloaded for the card to offer; if that fails, the run stays.
+  const run = result.toolRun
+  if (run) {
+    try {
+      result.metadata = await downloadMetadata(url, token, run, onProgress)
+      await deleteToolRun(url, token, run.id, onProgress)
+      run.deleted = true
+    } catch (e) {
+      result.warnings.push(
+        `MARA keeps its copy of the session (tool run ${run.id}): ${e.message}`
+      )
+    }
+  }
+  if (done) onProgress(done)
+  return result
+}
+
+const toolRunUrl = (url, id) =>
+  `${trimSlash(url)}/api/tools/runs/${encodeURIComponent(id)}`
+
+async function maraRequest(method, url, token) {
+  const res = await fetch(url, {
+    method,
+    headers: { Authorization: `Bearer ${token}` }
   })
+  if (!res.ok) throw new Error(`${method} ${url} returned HTTP ${res.status}`)
+  return res
+}
+
+// the run's *_metadata.json as {name, text}, or null when it has none
+async function downloadMetadata(url, token, run, onProgress) {
+  const name = (run.files || []).find(f => f.endsWith('_metadata.json'))
+  if (!name) return null
+  onProgress({ step: 'cleanup', message: `Downloading ${name}` })
+  const file = `${toolRunUrl(url, run.id)}/${encodeURIComponent(name)}`
+  const res = await maraRequest('GET', file, token)
+  return { name, text: await res.text() }
+}
+
+async function deleteToolRun(url, token, id, onProgress) {
+  onProgress({
+    step: 'cleanup',
+    message: `Deleting MARA's copy of the session (tool run ${id})`
+  })
+  await maraRequest('DELETE', toolRunUrl(url, id), token)
 }

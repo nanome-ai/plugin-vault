@@ -131,6 +131,16 @@ test('items outside the folder, hidden items and the vault root are refused', ()
   )
 })
 
+test('the shared folder is not zipped whole, but a selection in it is', () => {
+  assert.throws(
+    () => Zip.plan('shared/', []),
+    e => e.status === 400 && /not zipped whole/.test(e.message)
+  )
+  const plan = Zip.plan('shared/', ['proj/sub/'])
+  assert.strictEqual(plan.name, 'sub.zip')
+  assert.deepStrictEqual(plan.entries.map(e => e.name), ['proj/sub/b.cif'])
+})
+
 test('a selection of only locked folders is refused', () => {
   assert.throws(
     () => Zip.plan('shared/proj/', ['locked/']),
