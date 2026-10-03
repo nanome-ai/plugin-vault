@@ -24,6 +24,16 @@ Using [Gotenberg](https://github.com/thecodingmachine/gotenberg), the following 
 - Documents: `.doc` `.docx` `.txt` `.rtf` `.odt`
 - Presentations: `.ppt` `.pptx` `.odp`
 
+### Web UI
+
+- **Select** files and folders with a click, ctrl/cmd-click, shift-click, the checkboxes, or ctrl/cmd+A. Esc or a click on empty space clears the selection.
+- **Download** a file with a double-click or its right-click menu. A folder downloads as a zip from its right-click menu (not the shared folder as a whole: it holds everyone's files), and a selection of several items downloads as one zip from the toolbar or the right-click menu. Files in an encrypted folder are decrypted with its key. Encrypted folders inside a selection need their own key, so they are left out and named after the download starts.
+- **Open in Nanome 2** is in the right-click menu of files Nanome 2 can use, for one file or a selection:
+  - Structure files (`.pdb` `.pqr` `.cif` `.mmcif` `.sdf` `.xyz`) load into a new Nanome 2 workspace, or into an existing one picked from a list of the user's workspaces (most recently opened first). Each file is loaded with its default representations, as the Nanome 2 web app does, into the workspace's first scene.
+  - v1 sessions (`.nanome` `.nanoscenes`) are converted with the Nanome v1 Session Importer tool on the Nanome 2 web app (MARA) into a new workspace each, which is read back and checked. A session's PNG and JPEG images, and the PDF pages v1 saved as pictures, come along as image annotations where v1 had their panels. A session with nothing Nanome 2 can show (no structure and no such image) becomes an empty workspace, as v1 opens it, and the card says why. Sessions are converted one at a time, in the order chosen. The conversion is experimental and not always exact, so each time it starts with a notice that has to be acknowledged with a checkbox. Afterwards MARA's copy of the session, and of what was converted from it, is deleted; v1's metadata in full, which the workspace does not take in, is offered as a download on the card. The original PDFs and images the converter extracts are not offered: they stay in the session file in Vault. The import code, `server/ui/src/nanome2/pipeline.js`, documents each step and its limits. It started as the import code of the retired Open in Nanome 2 Chrome extension and has since taken the fixes that testing the importer on a large set of v1 sessions led to; it leaves out references to private source files.
+
+  Both use the Vault login, so they ask for one first. Progress and a link to the workspace show in a card at the bottom left. The work runs in the page, so the tab has to stay open until it finishes; converting a large session can take several minutes. A banner at the top of the page points Classic users to Nanome 2 whenever this is enabled.
+
 ## Usage
 
 To run Vault in a Docker container:
@@ -44,6 +54,10 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 
   Enables enforced authentication, preventing users from accessing files in the Web UI unless they are logged in.
 
+- `--disable-nanome2`
+
+  Hide Open in Nanome 2 and the Nanome 2 banner, for example when browsers using this Vault cannot reach the Nanome 2 web app.
+
 - `--https`
 
   Enable HTTPS using a self-signed certificate. If port is not set, port will default to 443.
@@ -51,6 +65,14 @@ $ ./deploy.sh -a <plugin_server_address> [optional args]
 - `--keep-files-days days`
 
   Automatically delete files that haven't been accessed in a given number of days. Example: to delete untouched files after 2 weeks: `--keep-files-days 14`
+
+- `--nanome2-url url`
+
+  The Nanome 2 web app that Open in Nanome 2 uses. Defaults to `https://app.nanome.ai`.
+
+- `--nanome2-tool-id id`
+
+  The id of the Nanome v1 Session Importer tool on that web app. Defaults to `01M32ZZKF3RPH80EBW73T2VVKZ`.
 
 - `--ui-message message`
 
@@ -107,7 +129,18 @@ $ yarn install
 $ yarn run serve
 ```
 
-Note: this will only work if the Vault server is running on the default port (without using the `-w` option). To work with a non-default port, change the proxy settings in `vue.config.js`.
+Note: this proxies API requests to a Vault server on `http://localhost`. For a server on another port, set `VAULT_SERVER`, e.g. `VAULT_SERVER=http://localhost:8420 yarn run serve`.
+
+The UI build (Vue CLI 3, webpack 4) needs Node 16, the version in `docker/server.Dockerfile`.
+
+---
+
+To run the tests (Node 16 or newer):
+
+```sh
+$ cd server && yarn test
+$ cd server/ui && yarn test
+```
 
 ## License
 

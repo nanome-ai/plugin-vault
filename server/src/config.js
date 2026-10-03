@@ -3,6 +3,8 @@ const config = {
   CONVERTER_URL: 'http://vault-converter:3000',
   ENABLE_AUTH: false,
   KEEP_FILES_DAYS: 0,
+  NANOME2_URL: 'https://app.nanome.ai',
+  NANOME2_TOOL_ID: '01M32ZZKF3RPH80EBW73T2VVKZ',
   UI_MESSAGE: '',
   USER_STORAGE: 0,
   USER_STORAGE_MSG: ''
@@ -33,6 +35,14 @@ if (process.env.ENABLE_AUTH) {
 if (process.env.KEEP_FILES_DAYS) {
   config.KEEP_FILES_DAYS = +process.env.KEEP_FILES_DAYS
 }
+if (process.env.NANOME2_URL) {
+  config.NANOME2_URL = process.env.NANOME2_URL
+}
+if (process.env.NANOME2_TOOL_ID) {
+  config.NANOME2_TOOL_ID = process.env.NANOME2_TOOL_ID
+}
+let disableNanome2 =
+  (process.env.DISABLE_NANOME2 || '').toLowerCase() === 'true'
 if (process.env.UI_MESSAGE) {
   config.UI_MESSAGE = process.env.UI_MESSAGE
 }
@@ -53,11 +63,22 @@ while (args.length) {
     config.ENABLE_AUTH = true
   } else if (arg === '--keep-files-days') {
     config.KEEP_FILES_DAYS = +args.shift()
+  } else if (arg === '--nanome2-url') {
+    config.NANOME2_URL = args.shift()
+  } else if (arg === '--nanome2-tool-id') {
+    config.NANOME2_TOOL_ID = args.shift()
+  } else if (arg === '--disable-nanome2') {
+    disableNanome2 = true
   } else if (arg === '--ui-message') {
     config.UI_MESSAGE = args.shift().replace(/_/g, ' ')
   } else if (arg === '--user-storage') {
     setUserStorageConfig(args.shift())
   }
 }
+
+// Open in Nanome 2 runs in the browser against this Nanome 2 web app (MARA)
+config.NANOME2_URL = disableNanome2
+  ? ''
+  : config.NANOME2_URL.replace(/\/+$/, '')
 
 module.exports = config

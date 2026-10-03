@@ -1,5 +1,5 @@
 <template>
-  <div class="toolbar flex text-lg items-center">
+  <div class="toolbar flex flex-wrap text-lg items-center">
     <div class="toggle relative mr-2 flex">
       <input
         @input="$emit('display-mode', $event.target.value)"
@@ -46,6 +46,32 @@
       <fa-icon icon="cloud-upload-alt" />
       <span class="hidden ml-1 lg:inline"> upload</span>
     </button>
+    <div v-if="folderItems.length" class="flex items-center ml-auto">
+      <label
+        class="select-all btn rounded flex items-center"
+        :title="count ? 'clear selection' : 'select all'"
+      >
+        <input
+          type="checkbox"
+          class="select-box"
+          :checked="count > 0"
+          :indeterminate.prop="count > 0 && !allSelected"
+          @change="toggleAll"
+        />
+        <span class="ml-2" :class="{ 'hidden sm:inline': !count }">
+          {{ count ? `${count} selected` : 'select all' }}
+        </span>
+      </label>
+      <button
+        v-if="count"
+        @click="$emit('download-selection')"
+        class="btn primary rounded ml-2"
+        title="download selected"
+      >
+        <fa-icon icon="file-download" />
+        <span class="ml-1"> download</span>
+      </button>
+    </div>
     <!-- <div class="flex-grow"></div>
     <div class="search relative">
       <input
@@ -59,8 +85,45 @@
   </div>
 </template>
 
+<script>
+import { mapState } from 'vuex'
+
+export default {
+  computed: {
+    ...mapState(['selection', 'folderItems']),
+
+    count() {
+      return this.selection.items.length
+    },
+
+    allSelected() {
+      const { folder, items } = this.selection
+      return (
+        folder === this.$route.path && items.length === this.folderItems.length
+      )
+    }
+  },
+
+  methods: {
+    toggleAll() {
+      if (this.count) {
+        this.$store.commit('CLEAR_SELECTION')
+      } else {
+        this.$store.commit('SELECT', {
+          folder: this.$route.path,
+          items: this.folderItems.slice()
+        })
+      }
+    }
+  }
+}
+</script>
+
 <style lang="scss">
 .toolbar {
+  // the selection controls move to their own row on narrow screens
+  row-gap: 0.5rem;
+
   .toggle {
     input {
       position: absolute !important;
@@ -78,6 +141,11 @@
     input:checked + label {
       @apply bg-gray-700 text-white;
     }
+  }
+
+  .select-all {
+    cursor: pointer;
+    user-select: none;
   }
 
   .search {

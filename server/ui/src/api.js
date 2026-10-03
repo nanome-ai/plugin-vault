@@ -8,6 +8,15 @@ function replacePath(path) {
     .replace(/[#?]/g, '_')
 }
 
+function saveAs(href, filename) {
+  const a = document.createElement('a')
+  a.href = href
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
 function addSlash(path) {
   return path.replace(/\b$/, '/')
 }
@@ -111,7 +120,7 @@ const API = {
     })
   },
 
-  async download(path) {
+  fetchFile(path) {
     const options = { headers: {} }
     const key = API.keys.get(path)
     if (key) {
@@ -122,17 +131,42 @@ const API = {
       options.headers['Authorization'] = 'Bearer ' + store.state.token
     }
 
-    path = replacePath(path)
-    const blob = await fetch('/files' + path, options).then(res => res.blob())
+    return fetch('/files' + replacePath(path), options)
+  },
 
-    const a = document.createElement('a')
+  async download(path) {
+    const blob = await API.fetchFile(path).then(res => res.blob())
     const url = URL.createObjectURL(blob)
-    a.href = url
-    a.download = path.substring(path.lastIndexOf('/') + 1)
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
+    saveAs(
+      url,
+      replacePath(path)
+        .split('/')
+        .pop()
+    )
     URL.revokeObjectURL(url)
+  },
+
+  async getFileBytes(path) {
+    const res = await API.fetchFile(path)
+    if (!res.ok) {
+      const why = {
+        401: 'Vault did not accept your login, please log in again',
+        403: 'Vault refused the file; is the folder key still unlocked?',
+        404: 'Vault has no such file; was it renamed or moved?'
+      }
+      throw new Error(why[res.status] || `Vault returned HTTP ${res.status}`)
+    }
+    return res.arrayBuffer()
+  },
+
+  // items: names inside the folder at path; none zips the folder itself
+  zip(path, items = [], name) {
+    return sendCommand(path, 'zip', { items: JSON.stringify(items), name })
+  },
+
+  // the browser streams the zip to disk itself
+  downloadZip({ id, name }) {
+    saveAs(`/zip/${id}/${encodeURIComponent(name)}`, name)
   },
 
   list(path) {

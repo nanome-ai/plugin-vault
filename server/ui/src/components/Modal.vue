@@ -1,11 +1,16 @@
 <template>
   <div v-if="showing" @click.self="cancel" class="modal">
     <div class="modal-body">
-      <div class="p-4">
+      <div class="p-4" :class="{ 'text-left': options.acknowledge }">
         <h2 v-if="options.title">{{ options.title }}</h2>
         <p v-if="options.body" v-html="options.body"></p>
 
         <div class="mt-2">
+          <label v-if="options.acknowledge" class="acknowledge">
+            <input v-model="acknowledged" type="checkbox" class="select-box" />
+            <span>{{ options.acknowledge }}</span>
+          </label>
+
           <template v-if="options.type === 'prompt'">
             <input
               ref="prompt"
@@ -132,7 +137,9 @@ const defaults = {
   okClass: 'primary',
   cancelTitle: 'cancel',
   cancelClass: '',
-  password: false
+  password: false,
+  // text of a checkbox that has to be checked before ok is enabled
+  acknowledge: ''
 }
 
 const deferred = () => {
@@ -157,12 +164,14 @@ export default {
     options: { ...defaults },
     input1: '',
     input2: '',
+    acknowledged: false,
     deferred: deferred()
   }),
 
   computed: {
     okDisabled() {
       if (this.loading) return true
+      if (this.options.acknowledge && !this.acknowledged) return true
 
       if (this.options.type === 'login') {
         return !this.input1 || !this.input2
@@ -204,6 +213,7 @@ export default {
 
     show(options) {
       Object.assign(this.options, defaults, options)
+      this.acknowledged = false
       this.showing = true
 
       if (this.options.type === 'prompt') {
@@ -356,6 +366,14 @@ export default {
   &-body {
     @apply bg-white rounded shadow overflow-hidden;
     width: 20rem;
+  }
+
+  .acknowledge {
+    @apply flex items-start mt-2 cursor-pointer;
+
+    .select-box {
+      @apply flex-shrink-0 mt-1 mr-2;
+    }
   }
 
   &-actions {

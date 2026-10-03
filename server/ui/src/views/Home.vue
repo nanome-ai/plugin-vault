@@ -1,5 +1,6 @@
 <template>
   <div class="home min-h-full container m-auto bg-white flex flex-col">
+    <nanome2-banner />
     <header class="mb-4 mx-auto text-white">
       <div class="inline-flex items-baseline text-5xl">
         <img class="mr-4" src="@/assets/logo.png" /> Vault
@@ -43,7 +44,10 @@
       <div class="text-left">
         <div class="text-lg px-4 py-2 ml-4 rounded bg-gray-200 inline">
           <template v-if="name">
-            Welcome <b>{{ name }}!</b>&nbsp;
+            Welcome <b>{{ name }}!</b>
+            <!-- the account files are opened in Nanome 2 as -->
+            <span v-if="email" class="ml-1 text-gray-600">({{ email }})</span
+            >&nbsp;
             <a @click="$store.dispatch('logout')" class="link text-red-500"
               >log out</a
             >
@@ -63,11 +67,19 @@
 <script>
 import { mapState } from 'vuex'
 import FileExplorer from '@/components/FileExplorer'
+import Nanome2Banner from '@/components/Nanome2Banner'
 
 export default {
-  components: { FileExplorer },
+  components: { FileExplorer, Nanome2Banner },
   data: () => ({ showMore: false }),
-  computed: mapState(['authEnabled', 'token', 'name', 'extensions', 'message'])
+  computed: mapState([
+    'authEnabled',
+    'token',
+    'name',
+    'email',
+    'extensions',
+    'message'
+  ])
 }
 </script>
 

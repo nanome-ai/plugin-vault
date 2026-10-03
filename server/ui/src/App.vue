@@ -2,15 +2,17 @@
   <div id="app" class="w-screen h-screen">
     <router-view />
     <UploadManager />
+    <Nanome2Imports />
   </div>
 </template>
 
 <script>
 import { mapState } from 'vuex'
+import Nanome2Imports from '@/components/Nanome2Imports'
 import UploadManager from '@/components/UploadManager'
 
 export default {
-  components: { UploadManager },
+  components: { Nanome2Imports, UploadManager },
 
   computed: mapState(['unique']),
 
