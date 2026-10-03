@@ -481,7 +481,8 @@ function pdbCharge(text) {
 }
 
 /** PDB -> models. Model serials come from MODEL records, 1 without any. CONECT pairs are bonds whose order is how often the pair is listed in its
- * more frequent direction, never aromatic; they apply to every model. */
+ * more frequent direction, never aromatic; a model takes the pairs whose two serials it holds, as
+ * v2 does. */
 export function parsePdbModels(text) {
   const models = [];
   const listed = new Map(); // "a b" -> times b is listed on a's CONECT lines
@@ -522,7 +523,10 @@ export function parsePdbModels(text) {
     bonds.push({ a, b, kind: times === 2 ? 2 : times === 3 ? 3 : 1 });
   }
   const list = bondList(bonds);
-  for (const model of models) Object.assign(model, { bonds: list, allBonds: false });
+  for (const model of models) {
+    const present = new Set(model.atoms.map(a => a.serial));
+    Object.assign(model, { bonds: list.filter(b => present.has(b.a) && present.has(b.b)), allBonds: false });
+  }
   return models;
 }
 
@@ -582,76 +586,177 @@ export function cifLoops(text) {
   return loops;
 }
 
-const CIF_ORDERS = { sing: 1, doub: 2, trip: 3, arom: 4 };
+// v2's bond orders for _struct_conn.pdbx_value_order and _chem_comp_bond.value_order: exactly
+// 'doub' and 'trip', anything else single.
+const CIF_V2_ORDERS = { doub: 2, trip: 3 };
 const cifValue = value => (value === undefined || value === '?' || value === '.' ? null : value);
+const isLetter = ch => typeof ch === 'string' && /^\p{L}$/u.test(ch);
+/** An atom_site insertion code as v2 reads it: the first letter anywhere in the value, else none
+ * ('?' and '.' hold none). */
+const cifInsertion = value => [...String(value ?? '')].find(isLetter) || '';
+/** A _struct_conn insertion code as v2 reads it: the value's first character when that is a
+ * letter, else none. */
+const connInsertion = value => (isLetter(String(value ?? '')[0]) ? String(value)[0] : '');
+/** An integer as v2 reads one: an optional sign and digits, blanks around allowed; null otherwise. */
+const cifInt = value => (/^\s*[+-]?\d+\s*$/.test(String(value ?? '')) ? parseInt(value, 10) : null);
+const residueKey = (chain, number, code) => JSON.stringify([chain, number, code]);
 
-/** mmCIF -> models by pdbx_PDB_model_num (1 without the column). Bonds: _chem_comp_bond rows apply
- * to every residue of that name by atom name, _struct_conn 'covale' rows join two residues' atoms
- * (what v2 takes from the file). */
+/**
+ * mmCIF -> models by pdbx_PDB_model_num (1 without the column), with the bonds v2 takes from the
+ * file, per model (v1-parser-tool's tests/v2_mmcif.py does the same in Python):
+ * - atoms are named by the auth_* columns when atom_site has all four (atom, residue number,
+ *   residue name, chain), every auth_seq_id is an integer and no auth atom, residue or chain name
+ *   is blank; else by the label_* ones, the residue number from pdbe_label_seq_id when there is
+ *   one, '.' read as 0;
+ * - _struct_conn rows of conn_type 'covale' or 'disulf' join two atoms found by chain, residue
+ *   number (auth or label, like the atoms), insertion code and ptnr*_label_atom_id: v2 lists a
+ *   residue's atoms from where the chain or the number changes in file order (so a residue that
+ *   differs from the one before it only by insertion code joins that one's list, and its own key
+ *   finds nothing), and takes the FIRST atom of that name in the list. Order 'doub' 2, 'trip' 3,
+ *   anything else 1, never aromatic;
+ * - _chem_comp_bond rows (only small-molecule files still have them) bind, in every residue of
+ *   that name grouped by residue number alone, the first atom of each name; aromatic (4) when
+ *   pdbx_aromatic_flag is 'Y'. With such a table v2 drops a repeat of a bond listed with its
+ *   atoms in the same order.
+ * A pair v2 still holds twice keeps the kind listed last, as compareModel reads v2's bonds back.
+ */
 export function parseMmcifModels(text) {
   const loops = cifLoops(text);
   const site = loops.atom_site;
   if (!site) throw new Error('no _atom_site loop');
   const column = (...names) => names.map(n => site.columns.indexOf(n)).find(i => i >= 0) ?? -1;
+  const blank = value => value === undefined || !String(value).trim();
+  const authColumns = ['auth_atom_id', 'auth_seq_id', 'auth_comp_id', 'auth_asym_id'].map(n => site.columns.indexOf(n));
+  // v2 takes the auth names only when all four read cleanly, and then reads _struct_conn by auth
+  // too
+  const auth = authColumns.every(i => i >= 0) && site.rows.every(row =>
+    cifInt(row[authColumns[1]]) !== null && [0, 2, 3].every(k => !blank(row[authColumns[k]])));
+  const naming = name => column(`${auth ? 'auth' : 'label'}_${name}`);
   const c = {
     id: column('id'), x: column('Cartn_x'), y: column('Cartn_y'), z: column('Cartn_z'), model: column('pdbx_PDB_model_num'),
-    element: column('type_symbol'), charge: column('pdbx_formal_charge'), atom: column('label_atom_id', 'auth_atom_id'),
-    comp: column('label_comp_id', 'auth_comp_id'), chain: column('auth_asym_id', 'label_asym_id'), seq: column('auth_seq_id', 'label_seq_id'),
+    element: column('type_symbol'), charge: column('pdbx_formal_charge'), atom: naming('atom_id'),
+    comp: naming('comp_id'), chain: naming('asym_id'), seq: auth ? column('auth_seq_id') : column('pdbe_label_seq_id', 'label_seq_id'),
     ins: column('pdbx_PDB_ins_code'),
   };
   if (c.id < 0 || c.x < 0 || c.y < 0 || c.z < 0) throw new Error('_atom_site has no id / Cartn_x / Cartn_y / Cartn_z');
   const models = new Map();
   for (const row of site.rows) {
     const serial = c.model < 0 ? 1 : parseInt(row[c.model], 10);
-    if (!models.has(serial)) models.set(serial, { serial, atoms: [], residues: new Map() });
+    if (!models.has(serial)) models.set(serial, { serial, atoms: [], names: [], comps: [], chains: [], numbers: [], codes: [] });
     const model = models.get(serial);
     const charge = c.charge < 0 ? null : cifValue(row[c.charge]);
-    const atom = {
+    model.atoms.push({
       serial: parseInt(row[c.id], 10), x: parseFloat(row[c.x]), y: parseFloat(row[c.y]), z: parseFloat(row[c.z]),
       element: c.element < 0 ? null : cifValue(row[c.element]), charge: charge === null ? null : parseInt(charge, 10),
-    };
-    model.atoms.push(atom);
-    const key = [row[c.chain], row[c.seq], cifValue(row[c.ins]) || ''].join('|');
-    if (!model.residues.has(key)) model.residues.set(key, { comp: row[c.comp], atoms: new Map() });
-    model.residues.get(key).atoms.set(row[c.atom], atom.serial);
+    });
+    model.names.push(row[c.atom]);
+    model.comps.push(row[c.comp]);
+    model.chains.push(row[c.chain]);
+    // label numbers: '.' (no residue number) is 0
+    const number = !auth && row[c.seq] === '.' ? 0 : cifInt(row[c.seq]);
+    model.numbers.push(number === null ? row[c.seq] : number);
+    model.codes.push(c.ins < 0 ? '' : cifInsertion(row[c.ins]));
   }
 
-  const templates = new Map(); // comp_id -> [[atom name, atom name, kind]]
-  const chem = loops.chem_comp_bond;
-  if (chem) {
-    const at = name => chem.columns.indexOf(name);
-    for (const row of chem.rows) {
-      const kind = row[at('pdbx_aromatic_flag')] === 'Y' ? 4 : CIF_ORDERS[String(row[at('value_order')]).toLowerCase()] || 1;
-      const comp = row[at('comp_id')];
-      if (!templates.has(comp)) templates.set(comp, []);
-      templates.get(comp).push([row[at('atom_id_1')], row[at('atom_id_2')], kind]);
-    }
-  }
+  // _struct_conn: [[chain, number, insertion code, atom name] x 2, kind]
   const links = [];
   const conn = loops.struct_conn;
   if (conn) {
     const at = name => conn.columns.indexOf(name);
-    for (const row of conn.rows) {
-      if (row[at('conn_type_id')] !== 'covale') continue;
-      const end = n => [[row[at(`ptnr${n}_auth_asym_id`)], row[at(`ptnr${n}_auth_seq_id`)], cifValue(row[at(`pdbx_ptnr${n}_PDB_ins_code`)]) || ''].join('|'), row[at(`ptnr${n}_label_atom_id`)]];
-      links.push([end(1), end(2), CIF_ORDERS[String(row[at('pdbx_value_order')]).toLowerCase()] || 1]);
-    }
-  }
-  return [...models.values()].map(({ serial, atoms, residues }) => {
-    const bonds = [];
-    for (const residue of residues.values()) {
-      for (const [name1, name2, kind] of templates.get(residue.comp) || []) {
-        const a = residue.atoms.get(name1);
-        const b = residue.atoms.get(name2);
-        if (a !== undefined && b !== undefined) bonds.push({ a, b, kind });
+    const side = auth ? 'auth' : 'label';
+    const need = ['conn_type_id', `ptnr1_${side}_asym_id`, `ptnr2_${side}_asym_id`, `ptnr1_${side}_seq_id`, `ptnr2_${side}_seq_id`,
+      'ptnr1_label_atom_id', 'ptnr2_label_atom_id'];
+    if (need.every(name => at(name) >= 0)) {
+      const order = at('pdbx_value_order');
+      for (const row of conn.rows) {
+        const type = row[at('conn_type_id')];
+        if (type !== 'covale' && type !== 'disulf') continue;
+        const ends = [1, 2].map(n => {
+          const code = at(`pdbx_ptnr${n}_PDB_ins_code`);
+          return [row[at(`ptnr${n}_${side}_asym_id`)], cifInt(row[at(`ptnr${n}_${side}_seq_id`)]),
+            code < 0 ? '' : connInsertion(row[code]), row[at(`ptnr${n}_label_atom_id`)]];
+        });
+        if (ends[0][1] === null || ends[1][1] === null) continue; // v2 skips a row whose residue number is no integer
+        links.push([ends[0], ends[1], (order >= 0 && CIF_V2_ORDERS[row[order]]) || 1]);
       }
     }
-    for (const [[residue1, name1], [residue2, name2], kind] of links) {
-      const a = residues.get(residue1) && residues.get(residue1).atoms.get(name1);
-      const b = residues.get(residue2) && residues.get(residue2).atoms.get(name2);
-      if (a !== undefined && b !== undefined) bonds.push({ a, b, kind });
+  }
+
+  // _chem_comp_bond: residue name -> [[atom name, atom name, kind]], in the table's order; null
+  // without a complete table (v2 then applies none and keeps repeats)
+  let templates = null;
+  const chem = loops.chem_comp_bond;
+  if (chem) {
+    const at = name => chem.columns.indexOf(name);
+    if (['comp_id', 'atom_id_1', 'atom_id_2', 'value_order', 'pdbx_aromatic_flag'].every(name => at(name) >= 0)) {
+      templates = new Map();
+      for (const row of chem.rows) {
+        const comp = row[at('comp_id')];
+        if (!templates.has(comp)) templates.set(comp, []);
+        templates.get(comp).push([row[at('atom_id_1')], row[at('atom_id_2')],
+          row[at('pdbx_aromatic_flag')] === 'Y' ? 4 : CIF_V2_ORDERS[row[at('value_order')]] || 1]);
+      }
     }
-    return { serial, atoms, bonds: bondList(bonds), allBonds: false };
+  }
+
+  return [...models.values()].map(({ serial, atoms, names, comps, chains, numbers, codes }) => {
+    const index = new Map(); // residue key -> atom indexes, a list starting where chain or number changes
+    let current = null;
+    for (let i = 0; i < atoms.length; i++) {
+      if (current === null || chains[i] !== chains[i - 1] || numbers[i] !== numbers[i - 1]) {
+        const key = residueKey(chains[i], numbers[i], codes[i]);
+        if (!index.has(key)) index.set(key, []);
+        current = index.get(key);
+      }
+      current.push(i);
+    }
+    const firstOf = new Map(); // residue key -> atom name -> the first atom of that name in its list
+    const find = ([chain, number, code, name]) => {
+      const key = residueKey(chain, number, code);
+      if (!firstOf.has(key)) {
+        const byName = new Map();
+        for (const k of index.get(key) || []) if (!byName.has(names[k])) byName.set(names[k], k);
+        firstOf.set(key, byName);
+      }
+      const i = firstOf.get(key).get(name);
+      return i === undefined ? null : i;
+    };
+    let found = []; // [atom index, atom index, kind], as v2 lists them
+    for (const [end1, end2, kind] of links) {
+      const i = find(end1);
+      const j = find(end2);
+      if (i !== null && j !== null) found.push([i, j, kind]);
+    }
+    if (templates) {
+      const byName = new Map(); // residue name -> residue number -> atom indexes
+      for (let i = 0; i < atoms.length; i++) {
+        if (!byName.has(comps[i])) byName.set(comps[i], new Map());
+        const groups = byName.get(comps[i]);
+        if (!groups.has(numbers[i])) groups.set(numbers[i], []);
+        groups.get(numbers[i]).push(i);
+      }
+      for (const [comp, bonds] of templates) {
+        for (const [name1, name2, kind] of bonds) {
+          for (const group of (byName.get(comp) || new Map()).values()) {
+            const i = group.find(k => names[k] === name1);
+            const j = group.find(k => names[k] === name2);
+            if (i !== undefined && j !== undefined) found.push([i, j, kind]);
+          }
+        }
+      }
+      const seen = new Set();
+      found = found.filter(([i, j]) => !seen.has(`${i} ${j}`) && seen.add(`${i} ${j}`));
+    }
+    const byPair = new Map();
+    for (const [i, j, kind] of found) {
+      const a = atoms[i].serial;
+      const b = atoms[j].serial;
+      if (!Number.isInteger(a) || !Number.isInteger(b) || a === b) continue;
+      // v2 keeps both bonds of a pair listed twice; the read-back (compareModel) keeps the last
+      byPair.set(a < b ? `${a}-${b}` : `${b}-${a}`, { a: Math.min(a, b), b: Math.max(a, b), kind });
+    }
+    const bonds = [...byPair.values()].sort((p, q) => p.a - q.a || p.b - q.b);
+    return { serial, atoms, bonds, allBonds: false };
   });
 }
 
