@@ -435,11 +435,12 @@ export default {
       }
       job.state = warnings.length ? 'warn' : 'ok'
       job.percent = 100
+      const images = result.images ? `, ${plural(result.images, 'image')}` : ''
       job.message =
         `Created "${result.workspaceName}": ` +
         `${plural(result.entries.length, 'structure')}, ` +
         `${plural(result.components, 'component')}, ` +
-        `${plural(result.annotations, 'annotation')}.`
+        `${plural(result.annotations, 'annotation')}${images}.`
     },
 
     finishStructures(job, result) {

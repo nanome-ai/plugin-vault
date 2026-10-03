@@ -35,6 +35,8 @@ export const SESSION_STEPS = [
   'components',
   'frames',
   'annotations',
+  'images',
+  'view',
   'verify',
   'cleanup',
   'done'

@@ -6,11 +6,14 @@
  *      Converted mode skips this: the outputs come from a URL (a local server), already made
  *      by v1-parser-tool's tool/tool_main.py (prepare_local.py).
  *   2. The outputs are downloaded: one structure file per v1 complex (PDB, mmCIF or SDF), the
- *      components JSON and, when the session has measurements, the annotations JSON.
+ *      components JSON, the annotations JSON when the session has measurements, and the image
+ *      annotations JSON with its PNG / JPEG files when it has images or PDF pages.
  *   3. The Workspace API gets a new workspace, the structure files in the tool's order
  *      (entries/load-multiple, one file per request), the components with their EntrySerial
  *      filters remapped to the serials the loads returned (those of structures hidden in v1
- *      hidden with v2's component flag), and the annotations (GraphQL add*Annotations).
+ *      hidden with v2's component flag), the annotations (GraphQL add*Annotations) and the
+ *      image annotations (created, then their pictures uploaded). A session with nothing v2 can
+ *      show still gets its workspace, empty as v1 opens it, with the tool's reason as a warning.
  *   4. Every entry's stored models are read back and compared with the converted files: atom
  *      counts, coordinates, elements, formal charges and bond orders.
  *
@@ -188,7 +191,7 @@ export function parseToolOutputs(summary, filenames) {
   const warnings = [];
   const listed = summaryStructureLines(summary);
   if (listed === null) {
-    warnings.push('The tool summary has no readable "Structure files, in load order" list; the load order comes from the file names.');
+    if (numbered.length) warnings.push('The tool summary has no readable "Structure files, in load order" list; the load order comes from the file names.');
   } else if (listed.length !== numbered.length || listed.some((l, i) => l.file !== numbered[i].file || l.index !== numbered[i].index)) {
     throw new Error(`the summary lists [${listed.map(l => l.file).join(', ')}] but MARA returned [${numbered.map(s => s.file).join(', ')}]`);
   }
@@ -203,8 +206,13 @@ export function parseToolOutputs(summary, filenames) {
   // v1's metadata in full (Frames > Meta Data); v2 has no place for most of it, so it is
   // returned to the user with the tool run rather than loaded.
   const metadataFile = optional('_metadata.json');
+  // v1's images and PDF pages as v2 image annotations (the files they name are the _media_ ones)
+  const imageAnnotationsFile = optional('_image_annotations.json');
   if (!annotationsFile && summary.includes(`${base}_annotations.json`)) {
     throw new Error(`the summary names ${base}_annotations.json but MARA did not return it`);
+  }
+  if (!imageAnnotationsFile && summary.includes(`${base}_image_annotations.json`)) {
+    throw new Error(`the summary names ${base}_image_annotations.json but MARA did not return it`);
   }
   const structures = numbered.map((s, i) => ({
     ...s,
@@ -212,26 +220,45 @@ export function parseToolOutputs(summary, filenames) {
     atoms: listed ? listed[i].atoms : null,
     openFrame: listed ? listed[i].openFrame : null,
   }));
-  const used = new Set([componentsFile, annotationsFile, measurementsFile, metadataFile, ...structures.map(s => s.file)]);
-  const unused = files.filter(f => !used.has(f));
+  const used = new Set([componentsFile, annotationsFile, measurementsFile, metadataFile, imageAnnotationsFile, ...structures.map(s => s.file)]);
+  const unused = files.filter(f => !used.has(f) && !f.startsWith(`${base}_media_`));
   if (unused.length) warnings.push(`MARA returned files this import does not use: ${unused.join(', ')}`);
-  return { base, componentsFile, annotationsFile, measurementsFile, metadataFile, structures, warnings,
+  return { base, componentsFile, annotationsFile, measurementsFile, metadataFile, imageAnnotationsFile, structures, warnings,
     description: summaryDescription(summary) };
 }
 
 /**
  * Converted mode: the outputs are named explicitly, the structure files in entry order.
- * converted: {baseUrl, files, components, annotations?, summary?, names?}; `names` (complex names,
- * one per file) are optional: else the summary's list, else the `<base>_NN_<name>` part of the name.
+ * converted: {baseUrl, files, components, annotations?, imageAnnotations?, summary?, names?,
+ * nothingToImport?, scene?}; `names` (complex names, one per file) are optional: else the summary's
+ * list, else the `<base>_NN_<name>` part of the name. `nothingToImport` is the converter's
+ * result['nothing_to_import'] ('empty' or 'unsupported' when the session gives v2 no structure
+ * file and no image, else null; the summary's 'Nothing to import:' line says why) and `scene` its
+ * result['scene'] (the scene of a .nanoscenes deck converted, 1-based, else null).
  */
 export function convertedOutputs(converted) {
-  const { baseUrl, files, components, annotations = null, summary = '', names = null } = converted || {};
+  const { baseUrl, files, components, annotations = null, imageAnnotations = null, summary = '', names = null } = converted || {};
+  const { nothingToImport, scene = null } = converted || {};
   if (typeof baseUrl !== 'string' || !/^[a-z][a-z0-9+.-]*:\/\//i.test(baseUrl)) throw new Error('converted.baseUrl must be an absolute URL');
-  if (!Array.isArray(files) || !files.length || files.some(f => typeof f !== 'string' || !f)) {
-    throw new Error('converted.files must list the structure files in entry order');
+  // a session with no structure still makes a workspace: of its images, or empty, as v1 opens it
+  if (!Array.isArray(files) || files.some(f => typeof f !== 'string' || !f)) {
+    throw new Error('converted.files must be a list of structure file names, in entry order (it may be empty)');
   }
+  if (imageAnnotations !== null && (typeof imageAnnotations !== 'string' || !imageAnnotations)) throw new Error('converted.imageAnnotations must be a file name or null');
   if (typeof components !== 'string' || !components) throw new Error('converted.components must name the components JSON file');
   if (annotations !== null && (typeof annotations !== 'string' || !annotations)) throw new Error('converted.annotations must be a file name or null');
+  if (nothingToImport !== undefined && nothingToImport !== null && !['empty', 'unsupported'].includes(nothingToImport)) {
+    throw new Error(`converted.nothingToImport must be 'empty', 'unsupported' or null, not ${JSON.stringify(nothingToImport)}`);
+  }
+  // the converter says "nothing to import" exactly when it wrote no structure file and no image
+  // (tool_main.py). Only a note if not: the import goes by the files either way
+  const warnings = [];
+  if (nothingToImport !== undefined && Boolean(nothingToImport) !== (!files.length && !imageAnnotations)) {
+    warnings.push(nothingToImport
+      ? `The converter says there is nothing to import (${nothingToImport}), but it wrote ${files.length} structure file(s)${imageAnnotations ? ' and image annotations' : ''}; importing those.`
+      : 'The converter wrote no structure file and no image annotations, but does not say there is nothing to import.');
+  }
+  if (scene !== null && !(Number.isInteger(scene) && scene >= 1)) throw new Error(`converted.scene must be a scene number (1, 2, ...) or null, not ${JSON.stringify(scene)}`);
   const base = components.endsWith('_components.json') ? components.slice(0, -'_components.json'.length) : null;
   const listed = summaryStructureLines(summary);
   const listedMatches = listed && listed.length === files.length && listed.every((l, i) => l.file === files[i]);
@@ -242,8 +269,8 @@ export function convertedOutputs(converted) {
     return { index: i + 1, file, format: m[1].toLowerCase(), name: given || (listedMatches ? listed[i].name : nameFromFile(file, base)), atoms: listedMatches ? listed[i].atoms : null,
       openFrame: listedMatches ? listed[i].openFrame : null };
   });
-  return { base, baseUrl: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`, componentsFile: components, annotationsFile: annotations, structures, warnings: [],
-    description: summaryDescription(summary) };
+  return { base, baseUrl: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`, componentsFile: components, annotationsFile: annotations, imageAnnotationsFile: imageAnnotations, structures, warnings,
+    description: summaryDescription(summary), nothingToImport: nothingToImport || null, scene };
 }
 
 /** What the tool asks the workspace description to say (tool_main.py _description: the title,
@@ -1118,6 +1145,39 @@ async function bodyText(res) {
   }
 }
 
+/**
+ * The tool's `<base>_image_annotations.json` (v1's images and PDF pages): checked and turned into
+ * the Workspace API's create bodies, entry anchors remapped like the other annotations. Each item:
+ * {file, title, visible, targetWidth (A, v2 takes (0, 500]), anchor {eAnchorType Scene|Entry, offset,
+ * entries?}}. Returns [{file, mime, body}] in the tool's order.
+ */
+export function imageAnnotationRequests(list, serials) {
+  if (!Array.isArray(list)) throw new Error('the image annotations file is not a JSON list');
+  return list.map((a, i) => {
+    const where = `image annotation ${i + 1}`;
+    if (!a || typeof a !== 'object') throw new Error(`${where} is not an object`);
+    if (typeof a.file !== 'string' || !/\.(png|jpe?g)$/i.test(a.file)) throw new Error(`${where} names no PNG or JPEG file`);
+    if (typeof a.title !== 'string') throw new Error(`${where} has no title`);
+    if (!(typeof a.targetWidth === 'number' && a.targetWidth > 0 && a.targetWidth <= 500)) throw new Error(`${where}: targetWidth ${a.targetWidth} is not in (0, 500]`);
+    const anchor = a.anchor || {};
+    if (!['Scene', 'Entry'].includes(anchor.eAnchorType)) throw new Error(`${where}: anchor type ${anchor.eAnchorType} is not Scene or Entry`);
+    const [remapped] = remapAnnotations([{ anchor }], serials);
+    return {
+      file: a.file,
+      mime: /\.png$/i.test(a.file) ? 'image/png' : 'image/jpeg',
+      body: { serial: 0, anchor: remapped.anchor, targetWidth: a.targetWidth, title: a.title, visible: a.visible !== false },
+    };
+  });
+}
+
+/** The serial of the image annotation a create call added: the scene it returns, less `before`. */
+export function newImageSerial(scene, before) {
+  const listed = scene && Array.isArray(scene.annotations) ? scene.annotations : [];
+  const added = listed.filter(x => x && Number.isInteger(x.serial) && !before.has(x.serial)
+    && (x.type === undefined || String(x.type).toLowerCase() === 'image'));
+  return added.length === 1 ? added[0].serial : null;
+}
+
 /** `token` null: requests carry no Authorization header (the local server of converted mode must
  * never see the Nanome token). */
 function client(deps, token) {
@@ -1162,8 +1222,9 @@ function client(deps, token) {
  * Import one v1 session into a new v2 workspace.
  *
  * Tool-run mode (the default): bytes (ArrayBuffer | Uint8Array | Blob) and filename of the session;
- * MARA converts it. Converted mode: converted = {baseUrl, files, components, annotations, summary,
- * names} names outputs tool_main.py already wrote (prepare_local.py); no MARA tool run.
+ * MARA converts it. Converted mode: converted = {baseUrl, files, components, annotations,
+ * imageAnnotations, summary, names, nothingToImport, scene} names outputs tool_main.py already
+ * wrote (prepare_local.py); no MARA tool run.
  *
  * Both: token (a Nanome token MARA and the Workspace API accept), maraUrl, workspaceApiUrl
  * (default: MARA /api/info), workspaceName, entryNames, verify, verifyModels, verifyAtoms,
@@ -1261,7 +1322,7 @@ function convertedSource(o, deps) {
     filename: o.filename || `${outputs.base || 'session'}.nanome`,
     summary: typeof o.converted.summary === 'string' ? o.converted.summary : '',
     outputs,
-    warnings: [],
+    warnings: [...outputs.warnings],
     fetchFile: file => local.send('download', 'GET', new URL(encodeURIComponent(file), outputs.baseUrl).href),
     toolRun: null,
   };
@@ -1317,15 +1378,23 @@ async function importSession(o, deps, ctx, progress) {
   const warnings = [...source.warnings];
   step('outputs');
   const structures = outputs.structures;
-  if (!structures.length) throw new ImportFailure('outputs', 'the session holds no structure to load', { body: summary });
+  // nothing v2 can show: the workspace is still made (empty, as v1 opens the session), with the
+  // tool's own words on why, unless the caller refuses such sessions
+  const empty = !structures.length && !outputs.imageAnnotationsFile;
+  if (empty) {
+    const said = /^Nothing to import: .*$/m.exec(String(summary || ''));
+    const text = said ? said[0] : 'The v1 session holds no structure and no image or PDF page v2 can show; the workspace is empty, as v1 opens it.';
+    if (o.emptySessions === 'refuse') throw Object.assign(new ImportFailure('empty', text, { body: summary }), { nothingToImport: true });
+    warnings.push(text);
+  }
   if (structures.length > o.freeEntryLimit) {
     warnings.push(`This session has ${structures.length} structures; a free Nanome license holds at most ${o.freeEntryLimit} per workspace, so the load fails on a free license.`);
   }
-  progress('outputs', `${structures.length} structure file(s), ${outputs.componentsFile}` + (outputs.annotationsFile ? `, ${outputs.annotationsFile}` : ''));
+  progress('outputs', `${structures.length} structure file(s), ${[outputs.componentsFile, outputs.annotationsFile, outputs.imageAnnotationsFile].filter(Boolean).join(', ')}`);
 
   // 3. Download them.
   step('download');
-  const wanted = [...structures.map(s => s.file), outputs.componentsFile, outputs.annotationsFile].filter(Boolean);
+  const wanted = [...structures.map(s => s.file), outputs.componentsFile, outputs.annotationsFile, outputs.imageAnnotationsFile].filter(Boolean);
   const bytesOf = new Map();
   for (const [i, file] of wanted.entries()) {
     progress('download', `Downloading ${file}`, { index: i + 1, total: wanted.length });
@@ -1342,6 +1411,21 @@ async function importSession(o, deps, ctx, progress) {
   };
   const components = readJson(outputs.componentsFile);
   const annotations = outputs.annotationsFile ? readJson(outputs.annotationsFile) : [];
+  let images = [];
+  if (outputs.imageAnnotationsFile) {
+    const list = readJson(outputs.imageAnnotationsFile);
+    try {
+      images = imageAnnotationRequests(list, new Map(structures.map(s => [s.index, s.index])));
+    } catch (e) {
+      throw new ImportFailure('check', `${outputs.imageAnnotationsFile}: ${e.message}`, { body: textOf(outputs.imageAnnotationsFile) });
+    }
+    const files = [...new Set(images.map(a => a.file))];
+    for (const [i, file] of files.entries()) {
+      progress('download', `Downloading image ${file}`, { index: i + 1, total: files.length });
+      const res = await source.fetchFile(file);
+      bytesOf.set(file, new Uint8Array(await res.arrayBuffer()));
+    }
+  }
   // Check the files before anything is created: remap against 1..N, the tool's own numbering.
   step('check');
   const identity = new Map(structures.map(s => [s.index, s.index]));
@@ -1487,11 +1571,79 @@ async function importSession(o, deps, ctx, progress) {
     }
   }
 
+  // 9b. v1's images and PDF pages as image annotations: create each, then upload its picture. A
+  // picture that does not go up is removed again and reported; the workspace stays.
+  step('images');
+  let imageCount = 0;
+  const imageProblems = [];
+  const placed = [];   // scene-anchored images that went up: where they are, to face them
+  if (images.length) {
+    const annotationsUrl = `${wsBase}/scenes/${scene.serial}/annotations`;
+    const listed = await http.json('images', 'GET', annotationsUrl);
+    let before = new Set((Array.isArray(listed) ? listed : []).map(x => x && x.serial));
+    const requests = imageAnnotationRequests(JSON.parse(textOf(outputs.imageAnnotationsFile)), serials);
+    for (const [i, a] of requests.entries()) {
+      progress('images', `Adding image ${i + 1}/${requests.length}: ${a.body.title}`, { index: i + 1, total: requests.length });
+      let serial = null;
+      try {
+        const sceneNow = await http.json('images', 'POST', `${annotationsUrl}/image`, { json: a.body });
+        serial = newImageSerial(sceneNow, before);
+        if (serial === null) throw new ImportFailure('images', 'the new image annotation is not in the scene the API returned', { body: JSON.stringify(sceneNow).slice(0, 2000) });
+        before = new Set((sceneNow.annotations || []).map(x => x && x.serial));
+        const form = new deps.FormData();
+        form.append('file', new deps.Blob([bytesOf.get(a.file)], { type: a.mime }), a.file);
+        await http.send('images', 'PUT', `${annotationsUrl}/${serial}/image`, { form });
+        imageCount++;
+        if (a.body.anchor.eAnchorType === 'Scene' && a.body.anchor.offset) {
+          placed.push({ offset: a.body.anchor.offset, width: a.body.targetWidth, visible: a.body.visible });
+        }
+      } catch (e) {
+        imageProblems.push(`image ${i + 1} "${a.body.title}" (${a.file}): ${e.message}`);
+        if (serial !== null) {
+          try {
+            await http.send('images', 'DELETE', `${annotationsUrl}/${serial}`);
+            before.delete(serial);
+          } catch (e2) {
+            imageProblems.push(`  and its empty annotation ${serial} could not be removed: ${e2.message}`);
+          }
+        }
+      }
+    }
+    if (imageProblems.length) warnings.push(...imageProblems.map(p => `Image annotations: ${p}`));
+  }
+
+  // v2 fits its view to the structures it loads; with images only it does not, and they sit out of
+  // sight (the converter writes them in v1's workspace frame). Turn the scene to face them, the
+  // shown ones first: rotation (0, sqrt 1/2, sqrt 1/2, 0) undoes v2's y/z swap and v1's x mirror,
+  // keeping v1's up as up.
+  let pointOfView = null;
+  if (!entries.length && placed.length) {
+    step('view');
+    progress('view', 'Turning the scene to face the images');
+    const pts = placed.some(p => p.visible) ? placed.filter(p => p.visible) : placed;
+    const SCALE = 0.02;
+    const c = ['x', 'y', 'z'].map(k => pts.reduce((sum, p) => sum + p.offset[k], 0) / pts.length);
+    const r = Math.max(...pts.map(p => SCALE * (Math.hypot(p.offset.x - c[0], p.offset.y - c[1], p.offset.z - c[2]) + p.width / 2)));
+    const d = Math.max(0.4, r / (Math.tan(Math.PI / 6) * 0.8));
+    const transform = { position: { x: SCALE * c[0], y: -SCALE * c[1], z: d - 0.5 - SCALE * c[2] },
+      rotation: { x: 0, y: Math.SQRT1_2, z: Math.SQRT1_2, w: 0 }, scale: SCALE };
+    try {
+      const b = await http.json('view', 'POST', `${ws}/graphql`, {
+        json: { query: 'mutation($input: SetScenePointOfViewInput!) { setScenePointOfView(input: $input) { __typename } }', variables: { input: { sceneId: scene.id, transform } } },
+        headers: { Accept: 'application/json' },
+      });
+      if (b && b.errors) warnings.push(`Could not turn the scene to face the images: ${JSON.stringify(b.errors).slice(0, 300)}`);
+      else pointOfView = transform;
+    } catch (e) {
+      warnings.push(`Could not turn the scene to face the images: ${e.message}`);
+    }
+  }
+
   // 10. Read back what v2 stored.
   let verification = { ok: null, skipped: true, text: 'Not verified.', entries: [], problems: [], notes: [] };
   if (o.verify !== false) {
     step('verify');
-    verification = await verifyImport(http, { wsBase, scene, entries, textOf, componentCount: toAdd.length, hiddenSerials, annotationCount, o, progress });
+    verification = await verifyImport(http, { wsBase, scene, entries, textOf, componentCount: toAdd.length, hiddenSerials, annotationCount: annotationCount + imageCount, o, progress });
     warnings.push(...verification.problems.map(p => `Verification: ${p}`));
   }
 
@@ -1520,9 +1672,16 @@ async function importSession(o, deps, ctx, progress) {
     components: toAdd.length,
     hiddenComponents: hiddenSerials.length,
     annotations: annotationCount,
+    images: imageCount,
+    imageProblems,
+    empty,
+    nothingToImport: outputs.nothingToImport || null,
+    scene: outputs.scene || null,
+    pointOfView,
     verification,
     toolRun: source.toolRun ? { deleted: false, ...source.toolRun } : null,
-    converted: source.mode === 'converted' ? { baseUrl: outputs.baseUrl, files: structures.map(s => s.file), components: outputs.componentsFile, annotations: outputs.annotationsFile } : null,
+    converted: source.mode === 'converted' ? { baseUrl: outputs.baseUrl, files: structures.map(s => s.file), components: outputs.componentsFile, annotations: outputs.annotationsFile, imageAnnotations: outputs.imageAnnotationsFile,
+      nothingToImport: outputs.nothingToImport || null, scene: outputs.scene || null } : null,
   };
 }
 
@@ -1627,7 +1786,9 @@ async function verifyImport(http, { wsBase, scene, entries, textOf, componentCou
   report.ok = report.problems.length === 0;
   const counts = `${report.models} model(s), ${report.atoms} atom(s), largest coordinate deviation ${report.maxDeviation.toFixed(4)} A`;
   const hiddenText = hiddenSerials.length ? ` (${hiddenSerials.length} hidden, as in v1)` : '';
-  report.text = report.ok
+  report.text = report.ok && !entries.length
+    ? `Verified the scene: no entries, ${componentCount} component(s) and ${annotationCount} annotation(s).`
+    : report.ok
     ? `Verified ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}: ${counts}; elements, charges and bonds as in the files${report.metadataItems ? `, ${report.metadataItems} SD data item(s) kept as v2 model metadata` : ''}; ${componentCount} component(s)${hiddenText} and ${annotationCount} annotation(s) in the scene` +
       (report.framesSet ? `; ${report.framesSet} entr${report.framesSet === 1 ? 'y opens' : 'ies open'} on the frame v1 opens ${report.framesSet === 1 ? 'it' : 'them'} on` : '') + '.' +
       (report.notes.length ? ` ${report.notes.length} note(s) on differences v2 makes by design.` : '')
