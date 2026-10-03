@@ -35,6 +35,18 @@ export const DEFAULTS = Object.freeze({
   tolerance: 0.002, // angstrom; v2 keeps coordinates on a 0.001 A grid
   freeEntryLimit: 5, // structures a free license may hold in one workspace
   slowLoadSeconds: 120, // a structure file v2 takes longer than this to load is named in the warnings
+  // a load request v2 drops or answers 502/503/504 (a huge file can outlast the gateway while v2
+  // goes on loading it): the workspace is read every loadPollSeconds until the entry shows up.
+  // One budget per import: at most loadRecoverMax such loads are waited for, loadRecoverSeconds
+  // in all; past that a failed load fails the import at once, as it would without
+  loadRecoverSeconds: 300,
+  loadRecoverMax: 2,
+  loadPollSeconds: 10,
+  // a workspace creation v2 refuses because it ran into another change to the account's
+  // workspaces (HTTP 400, nothing created: isConcurrencyFailure) is sent again, up to
+  // workspaceRetries more times, after a pause that grows by workspaceRetrySeconds each time
+  workspaceRetries: 5,
+  workspaceRetrySeconds: 2,
   deleteToolRun: false, // delete MARA's copy of the upload and outputs once the workspace is built
 });
 
@@ -1195,7 +1207,8 @@ function client(deps, token) {
     try {
       res = await deps.fetch(url, { method, headers: all, body });
     } catch (e) {
-      throw new ImportFailure(step, `${method} ${url} failed: ${(e && e.message) || e}`, { url });
+      // no answer at all: the request was dropped (or the browser hid a gateway error without CORS headers)
+      throw Object.assign(new ImportFailure(step, `${method} ${url} failed: ${(e && e.message) || e}`, { url }), { dropped: true });
     }
     if (!res.ok) {
       throw new ImportFailure(step, `${method} ${url} returned HTTP ${res.status}`, { status: res.status, body: await bodyText(res), url });
@@ -1216,6 +1229,38 @@ function client(deps, token) {
   return { send, json };
 }
 
+/** v2's answer to a workspace creation that ran into another change to the same account's
+ * workspaces (two imports at once, the web app creating one): HTTP 400 whose body names a database
+ * operation "expected to affect 1 row(s)". Nothing was created, so the request can be sent again. */
+export function isConcurrencyFailure(e) {
+  return e instanceof ImportFailure && e.status === 400 && /expected to affect 1 row/.test(e.body);
+}
+
+/**
+ * `attempt()`, called again after a concurrency failure (isConcurrencyFailure), up to `retries`
+ * more times; any other failure, and the last concurrency failure, is thrown as it is (the last
+ * with the number of tries added to its message). The pause before try n + 1 is n to n + 1 times
+ * `seconds`, at random, so that two imports that ran into each other do not do so again.
+ * onRetry(n, retries) is called before each pause.
+ */
+export async function retryConcurrency(attempt, { retries = DEFAULTS.workspaceRetries, seconds = DEFAULTS.workspaceRetrySeconds, sleep, onRetry = () => {} } = {}) {
+  const pause = sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)));
+  const limit = Math.max(0, Math.floor(Number(retries) || 0));
+  for (let n = 1; ; n++) {
+    try {
+      return await attempt();
+    } catch (e) {
+      if (!isConcurrencyFailure(e)) throw e;
+      if (n > limit) {
+        if (limit) e.message += `; v2 answered ${n} tries with this concurrency error`;
+        throw e;
+      }
+      onRetry(n, limit);
+      await pause(Math.max(0, Number(seconds) || 0) * 1000 * (n + Math.random()));
+    }
+  }
+}
+
 // --- the import ---------------------------------------------------------------------------------------
 
 /**
@@ -1228,9 +1273,11 @@ function client(deps, token) {
  *
  * Both: token (a Nanome token MARA and the Workspace API accept), maraUrl, workspaceApiUrl
  * (default: MARA /api/info), workspaceName, entryNames, verify, verifyModels, verifyAtoms,
- * verifyDetail, tolerance, slowLoadSeconds, onProgress({step, message, index, total}), and
- * fetch / FormData / Blob / now (milliseconds) to use instead of the globals. Tool-run mode also:
- * toolId, toolArgs, deleteToolRun.
+ * verifyDetail, tolerance, slowLoadSeconds, loadRecoverSeconds, loadRecoverMax, loadPollSeconds,
+ * workspaceRetries, workspaceRetrySeconds, emptySessions ('refuse': a session with nothing v2 can
+ * show fails at step 'empty' instead of becoming an empty workspace), onProgress({step, message,
+ * index, total}), and fetch / FormData / Blob / now (milliseconds) / sleep(ms) to use instead of
+ * the globals. Tool-run mode also: toolId, toolArgs, deleteToolRun.
  *
  * Resolves to {workspaceId, url, summary, notes, warnings, entries, verification, ...}; rejects with
  * an ImportFailure naming the step and carrying the server's response body. A failure after the
@@ -1243,6 +1290,7 @@ export async function runImport(options = {}) {
     FormData: o.FormData || globalThis.FormData,
     Blob: o.Blob || globalThis.Blob,
     now: o.now || (() => Date.now()),
+    sleep: o.sleep || (ms => new Promise(resolve => setTimeout(resolve, ms))),
   };
   const ctx = { step: 'input', partial: {} };
   const progress = (step, message, extra = {}) => {
@@ -1347,6 +1395,52 @@ async function addedComponentSerials(http, componentsUrl, sent) {
   return ordered.map(c => c.serial);
 }
 
+/**
+ * After a load request v2 dropped or answered 502/503/504: the entry v2 made of the file anyway,
+ * read off the workspace (GET /workspaces/{id} lists its entries with their model ids, as
+ * load-multiple answers them) every `pauseMs` for up to `limitMs`. An entry counts once two reads
+ * in a row show it with the same models; one first seen on the last read gets one read more.
+ * `known`: serials of the entries loaded before. Resolves to {entry, waited} (entry: serial, name,
+ * models), or {entry: null, many, waited} when more than one new entry appeared (they cannot be
+ * told apart), or {entry: null, waited, lastError} when none did (waited in ms). Reads that fail
+ * are retried until the time is up (the API may be restarting).
+ */
+async function entryAfterFailedLoad(http, deps, { wsBase, known, limitMs, pauseMs, onWait = () => {} }) {
+  const started = deps.now();
+  let seen = null; // {serial, models} of the new entry on the read before
+  let lastError = null;
+  let extra = false;
+  for (;;) {
+    let workspace = null;
+    try {
+      workspace = await http.json('load', 'GET', wsBase);
+      lastError = null;
+    } catch (e) {
+      lastError = e;
+    }
+    if (workspace) {
+      const fresh = (workspace && Array.isArray(workspace.entries) ? workspace.entries : [])
+        .filter(e => e && Number.isInteger(e.serial) && !known.has(e.serial));
+      if (fresh.length > 1) return { entry: null, many: fresh, waited: deps.now() - started };
+      const now = fresh.length ? { serial: fresh[0].serial, models: Array.isArray(fresh[0].models) ? fresh[0].models.length : null } : null;
+      if (now && seen && now.serial === seen.serial && now.models === seen.models) return { entry: fresh[0], waited: deps.now() - started };
+      seen = now;
+    }
+    const waited = deps.now() - started;
+    if (waited >= limitMs) {
+      if (!seen || extra) return { entry: null, waited, lastError };
+      extra = true;
+    }
+    onWait(waited);
+    await deps.sleep(pauseMs);
+  }
+}
+
+/** A failed read of the workspace, for a message: its HTTP status, never the browser's own text
+ * ("Failed to fetch" in a failure's message means the load request itself got no answer; only
+ * that request may say so). */
+const readFailure = e => (e && Number.isInteger(e.status) ? `HTTP ${e.status}` : 'no answer');
+
 async function importSession(o, deps, ctx, progress) {
   const step = name => {
     ctx.step = name;
@@ -1440,7 +1534,14 @@ async function importSession(o, deps, ctx, progress) {
     ? `Converted from the Nanome v1 session ${filename} (MARA tool run ${source.toolRun.id}).`
     : `Converted from the Nanome v1 session ${filename} by a local converter (${outputs.baseUrl}).`)
     + (outputs.description ? ` ${outputs.description}` : '');
-  const workspace = await http.json('workspace', 'POST', `${ws}/workspaces`, { json: { name: workspaceName, description } });
+  let workspaceRetries = 0;
+  const workspace = await retryConcurrency(() => http.json('workspace', 'POST', `${ws}/workspaces`, { json: { name: workspaceName, description } }), {
+    retries: o.workspaceRetries, seconds: o.workspaceRetrySeconds, sleep: deps.sleep,
+    onRetry: (n, limit) => {
+      workspaceRetries = n;
+      progress('workspace', `Nanome 2 was changing this account's workspaces and created none; asking again (${n} of ${limit})`);
+    },
+  });
   if (!workspace || !workspace.id) throw new ImportFailure('workspace', 'the Workspace API returned no workspace id', { body: JSON.stringify(workspace) });
   const url = `${mara}/workspaces/${encodeURIComponent(workspace.id)}`;
   ctx.partial.workspaceId = workspace.id;
@@ -1455,6 +1556,13 @@ async function importSession(o, deps, ctx, progress) {
   // Entry serials only grow and are never reused, so take them from the answers, not 1..N.
   const serials = new Map();
   const entries = [];
+  // waiting for the entries of failed loads: one budget for the whole import, so a session of
+  // many huge files cannot wait loadRecoverSeconds for each
+  const recovery = {
+    totalMs: Math.max(0, Number(o.loadRecoverSeconds) || 0) * 1000, spentMs: 0,
+    max: Math.max(0, Math.floor(Number(o.loadRecoverMax) || 0)), loads: 0,
+    pauseMs: Math.max(1, Number(o.loadPollSeconds) || 0) * 1000,
+  };
   for (const [i, u] of uploads.entries()) {
     progress('load', `Loading structure file ${i + 1}/${uploads.length}: ${u.uploadName}`, { index: i + 1, total: uploads.length });
     const where = `structure file ${i + 1} of ${uploads.length}, ${u.file}; ${i} of the ${uploads.length} were loaded before it`;
@@ -1465,8 +1573,34 @@ async function importSession(o, deps, ctx, progress) {
         form: loadForm(deps, [{ name: u.uploadName, bytes: bytesOf.get(u.file) }]),
       });
     } catch (e) {
-      if (e instanceof ImportFailure) e.message += ` (${where})`;
-      throw e;
+      if (!(e instanceof ImportFailure)) throw e;
+      e.message += ` (${where})`;
+      // v2 may still be loading the file (a huge one outlasts the gateway): wait for its entry.
+      // A plain 500 is v2's own error (nothing was committed): it fails at once, as do 4xx.
+      if (!(e.dropped || [502, 503, 504].includes(e.status)) || !(recovery.totalMs > 0 && recovery.max > 0)) throw e;
+      if (recovery.loads >= recovery.max || recovery.spentMs >= recovery.totalMs) {
+        e.message += `; not waited for: this import already waited ${Math.round(recovery.spentMs / 1000)} s for the entries of ${recovery.loads} failed load(s)`
+          + ` (at most ${recovery.max} load(s) and ${Math.round(recovery.totalMs / 1000)} s per import)`;
+        throw e;
+      }
+      recovery.loads++;
+      const answer = e.dropped ? `v2 dropped the request (${(/ failed: (.*?) \(structure file /.exec(e.message) || [])[1] || 'no answer'})` : `v2 answered HTTP ${e.status}`;
+      const limitMs = recovery.totalMs - recovery.spentMs;
+      const found = await entryAfterFailedLoad(http, deps, {
+        wsBase, known: new Set(serials.values()), limitMs, pauseMs: recovery.pauseMs,
+        onWait: waited => progress('load', `${answer} loading ${u.uploadName}; waiting for its entry in the workspace (${Math.round(waited / 1000)} s of ${Math.round(limitMs / 1000)} s)`,
+          { index: i + 1, total: uploads.length }),
+      });
+      recovery.spentMs += found.waited;
+      if (!found.entry) {
+        e.message += found.many
+          ? `; then ${found.many.length} new entries appeared in the workspace (${found.many.map(x => x.serial).join(', ')}), which cannot be matched to the file`
+          : `; no entry for it appeared in the workspace within ${Math.round(found.waited / 1000)} s` +
+            (found.lastError ? `, and the last read of the workspace failed (${readFailure(found.lastError)})` : '');
+        throw e;
+      }
+      loaded = [found.entry];
+      warnings.push(`${answer} loading ${u.file}, but v2 went on loading it: entry ${found.entry.serial} was in the workspace ${Math.round((deps.now() - started) / 1000)} s after the request was sent.`);
     }
     const seconds = Math.max(0, deps.now() - started) / 1000;
     if (!Array.isArray(loaded) || loaded.length !== 1) {
@@ -1664,6 +1798,7 @@ async function importSession(o, deps, ctx, progress) {
     workspaceId: workspace.id,
     url,
     workspaceName,
+    workspaceRetries,
     sceneSerial: scene.serial,
     summary,
     notes: summaryNotes(summary),

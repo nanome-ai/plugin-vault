@@ -6,11 +6,15 @@
 //   components (without those an entry shows nothing).
 // - v1 sessions (.nanome / .nanoscenes) are converted with the Nanome 2
 //   importer tool on MARA into a new workspace, which is then read back and
-//   checked. pipeline.js does that. It comes from the Open in Nanome 2 Chrome
-//   extension this replaces (nanome-ai/open-in-nanome-2 a41260f, retired),
-//   where its tests are. This repo is public, so the copy leaves out the
-//   upstream comments' references to private Nanome 2 source files; the code
-//   is the same.
+//   checked. pipeline.js does that. It started as the import code of the Open
+//   in Nanome 2 Chrome extension this replaces (nanome-ai/open-in-nanome-2
+//   a41260f, retired, where the tests of that version are) and has changed
+//   since: it reads the bonds of PDB and mmCIF files the way Nanome 2 does,
+//   brings a session's images along, makes an empty workspace of a session
+//   with nothing Nanome 2 can show, waits for the entry of a load Nanome 2
+//   dropped, and asks again for a workspace Nanome 2 refused to create. This
+//   repo is public, so the file leaves out references to private Nanome 2
+//   source files.
 import API from '@/api'
 
 export const SESSION_FILE = /\.(nanome|nanoscenes)$/i
@@ -149,7 +153,7 @@ export async function listWorkspaces({ token, url }) {
 // workspace called `name` when there is none
 export async function loadStructures(options) {
   const { paths, token, url, workspace, name, onProgress } = options
-  const { ImportFailure } = await loadPipeline()
+  const { ImportFailure, retryConcurrency } = await loadPipeline()
   const counter = i => (paths.length > 1 ? ` (${i + 1}/${paths.length})` : '')
 
   const files = []
@@ -183,9 +187,23 @@ export async function loadStructures(options) {
       const description = `Loaded from Nanome Vault: ${files
         .map(f => f.name)
         .join(', ')}`
-      target = await request('workspace', 'POST', '/workspaces', {
-        json: { name, description }
-      })
+      // Nanome 2 refuses a creation that runs into another change to the
+      // account's workspaces, and creates nothing: ask again
+      target = await retryConcurrency(
+        () =>
+          request('workspace', 'POST', '/workspaces', {
+            json: { name, description }
+          }),
+        {
+          onRetry: (n, limit) =>
+            onProgress({
+              step: 'workspace',
+              message:
+                "Nanome 2 was changing this account's workspaces and " +
+                `created none; asking again (${n} of ${limit})`
+            })
+        }
+      )
       if (!target || !target.id) {
         throw new ImportFailure(
           'workspace',
